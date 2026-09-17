@@ -44,6 +44,13 @@ button:disabled{opacity:.4;cursor:default}
 .top{position:sticky;top:0;z-index:5;display:grid;grid-template-columns:88px 1fr 88px;align-items:center;padding:calc(env(safe-area-inset-top) + 6px) 8px 6px;background:var(--bg)}
 .top-t{margin:0;text-align:center;font-size:18px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .top-r{display:flex;justify-content:flex-end}
+.icon-btn.small{width:32px;height:32px;flex-shrink:0;color:var(--muted)}
+.accent-t{color:var(--accent)}
+.sym-dot{width:18px;height:18px;border-radius:9px;flex-shrink:0}
+.colors{display:flex;gap:8px}
+.swatch{width:30px;height:30px;border-radius:15px;border:2px solid transparent;padding:0}
+.swatch.on{border-color:var(--ink)}
+.opt-chip:disabled{opacity:1}
 .icon-btn{width:44px;height:44px;display:inline-flex;align-items:center;justify-content:center;border:0;background:none;color:var(--ink);border-radius:12px;padding:0}
 .text-btn{border:0;background:none;color:var(--accent);font-size:16px;min-height:44px;padding:0 8px;display:inline-flex;align-items:center}
 
@@ -209,7 +216,8 @@ button.tag{height:34px;padding:0 12px;font-size:14px;border-radius:10px;display:
 .strip button{width:64px;height:64px;border-radius:14px;overflow:hidden;border:0;padding:0;flex-shrink:0;background:var(--ph)}
 .strip img{width:100%;height:100%;object-fit:cover;display:block}
 .note-box{white-space:pre-wrap;padding:14px 0;font-size:16px}
-.line textarea{flex:1;min-width:0;border:0;background:none;font:inherit;font-size:16px;padding:14px 0;resize:none;text-align:right;line-height:1.5;overflow:hidden}
+.line textarea{flex:1;min-width:0;border:0;background:none;font:inherit;font-size:16px;padding:14px 0;resize:none;text-align:left;line-height:1.5;overflow:hidden}
+.note-input{width:100%;border:0;border-radius:16px;background:var(--card);padding:14px 16px;font:inherit;font-size:16px;line-height:1.5;resize:none;overflow:hidden;color:var(--ink);box-sizing:border-box}
 .crop-wrap{width:min(320px,78vw);height:min(320px,78vw);margin:10px auto 14px;border-radius:18px;overflow:hidden;background:#000;position:relative;touch-action:none}
 .crop-wrap img{position:absolute;left:50%;top:50%;transform-origin:center;will-change:transform;-webkit-user-drag:none;user-select:none;max-width:none}
 .crop-tools{display:flex;align-items:center;gap:10px}
@@ -231,7 +239,21 @@ button.tag{height:34px;padding:0 12px;font-size:14px;border-radius:10px;display:
 .avatar.big{width:84px;height:84px;border-radius:42px}
 .addbtn{display:flex;align-items:center;justify-content:center;gap:8px;color:var(--accent)}
 .cal{background:var(--card);border-radius:20px;padding:12px 10px 10px;margin-top:4px}
-.cal-h{display:flex;align-items:center;justify-content:space-between;padding:0 4px 6px}
+.cal-h{display:flex;align-items:center;gap:4px;padding:0 4px 8px}
+.cal-h b{flex:1;text-align:center}
+.cal-seg{display:flex;gap:2px;padding:3px;background:var(--bg);border-radius:10px;flex-shrink:0}
+.cal-seg button{height:28px;min-width:30px;padding:0 6px;border:0;border-radius:8px;background:none;color:var(--muted);font-size:13px}
+.cal-seg button.on{background:var(--card);color:var(--ink);font-weight:600}
+.cal-grid.week{grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
+.wk-col{display:flex;flex-direction:column;align-items:center;gap:2px}
+.wk-col .cal-cell{height:58px;width:100%}
+.wk-col .cal-cell .num{font-size:20px}
+.cal-year{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+.yr-cell{height:58px;border:0;border-radius:14px;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;color:var(--muted)}
+.yr-cell.has{background:var(--accent-soft);color:var(--ink)}
+.yr-cell .num{font-family:"Barlow Condensed","DIN Condensed",sans-serif;font-size:19px;font-weight:600}
+.yr-cell .dots{display:flex;gap:3px;height:6px}
+.yr-cell .dots i{width:6px;height:6px;border-radius:3px;display:block}
 .cal-h b{font-size:17px}
 .cal-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:2px}
 .cal-w{text-align:center;font-size:12px;color:var(--muted);padding-bottom:4px}
@@ -302,7 +324,7 @@ const BOXES = { human: '人用药', cat: '猫用药' };
 const REMIND_OPTIONS = [30, 60, 120];
 const LOG_TEXT = { add: '添加', in: '入库', use: '用完', open: '开封' };
 const FB_VER = '10.12.2';
-const APP_VER = '2026.09.17-13';
+const APP_VER = '2026.09.17-16';
 const MAX_PHOTOS = 6;
 const PHOTO_PX = 640;
 const PHOTO_Q = 0.62;
@@ -315,7 +337,7 @@ const COLS = ['meds', 'members', 'symptoms', 'logs', 'lists'];
 const state = {
   meds: new Map(), members: new Map(), symptoms: new Map(), logs: new Map(), lists: new Map(),
   ready: false, user: null, search: '', searchOpen: false, expiredOpen: false,
-  cal: '', calDay: '', symFilter: ''
+  cal: '', calDay: '', calView: 'month', symFilter: ''
 };
 let store = null;
 let sheet = null;
@@ -1297,6 +1319,8 @@ const WEEK = ['日', '一', '二', '三', '四', '五', '六'];
 let mform = null;
 let lf = null;
 let ask = null;
+let tpl = null;
+const activeSymId = () => (lf ? lf.symptomId : tpl);
 
 const membersOf = k => [...state.members.values()].filter(m => m.kind === k)
   .sort((a, b) => a.name.localeCompare(b.name, 'zh'));
@@ -1388,10 +1412,12 @@ function viewHealth(kind) {
       </div>
       ${svg(P.chev, 20)}</a>`;
   }).join('');
-  return topbar(backBtn('#/'), KINDS[kind] + '的生病记录', '') +
+  return topbar(backBtn('#/'), KINDS[kind] + '的生病记录',
+      `<a class="icon-btn" href="#/symptoms" aria-label="症状设置">${svg(P.gear)}</a>`) +
     `<main class="pad">
-      ${ms.length ? `<div class="mems">${rows}</div>` : '<p class="empty">还没有成员</p>'}
-      <a class="btn wide addbtn" href="#/member/new/${kind}">${svg(P.plus, 20, 2.2)}添加${kind === 'cat' ? '一只猫' : '一个人'}</a>
+      ${ms.length ? `<div class="mems">${rows}</div>` : ''}
+      <a class="btn wide addbtn" href="#/member/new/${kind}" style="margin-top:8px">${svg(P.plus, 20, 2.2)}添加${kind === 'cat' ? '一只猫' : '一个人'}</a>
+      ${ms.length ? '' : `<p class="hint" style="text-align:center">还没有成员，先添加${kind === 'cat' ? '一只猫' : '一个人'}</p>`}
     </main>`;
 }
 
@@ -1401,11 +1427,11 @@ function viewMemberForm(mode, arg) {
   if (!mform || mform.key !== key) {
     if (mode === 'new') {
       if (!KINDS[arg]) return notFound();
-      mform = { key, kind: arg, name: '', photo: '', birth: '', chip: '', note: '' };
+      mform = { key, kind: arg, name: '', photo: '', birth: '', weight: '', chip: '', note: '', fields: [] };
     } else {
       const m = state.members.get(arg);
       if (!m) return notFound();
-      mform = { key, id: m.id, kind: m.kind, name: m.name, photo: m.photo || '', birth: m.birth || '', chip: m.chip || '', note: m.note || '' };
+      mform = { key, id: m.id, kind: m.kind, name: m.name, photo: m.photo || '', birth: m.birth || '', weight: m.weight || '', chip: m.chip || '', note: m.note || '', fields: clone(m.fields || []) };
     }
   }
   const f = mform;
@@ -1421,9 +1447,15 @@ function viewMemberForm(mode, arg) {
       <div class="card">
         <label class="line"><span>名字</span><input id="mf-name" data-mf="name" type="text" placeholder="比如 胖胖" value="${esc(f.name)}"></label>
         <label class="line"><span>出生日期</span><input data-mf="birth" type="date" value="${f.birth}"></label>
+        <label class="line"><span>体重</span><input id="mf-weight" data-mf="weight" type="text" placeholder="比如 4.2kg" value="${esc(f.weight)}"></label>
         <label class="line"><span>芯片号</span><input id="mf-chip" data-mf="chip" type="text" placeholder="microchip number" value="${esc(f.chip)}"></label>
-        <label class="line"><span>备注</span><textarea id="mf-note" data-mf="note" rows="1" placeholder="体重、品种、医院…">${esc(f.note)}</textarea></label>
+        ${f.fields.map((x, i) => `<label class="line"><span>${esc(x.label)}</span>
+          <input id="mf-fx-${i}" data-mfx="${i}" type="text" placeholder="写点什么" value="${esc(x.value)}">
+          <button class="icon-btn small" data-act="mf-field-del" data-i="${i}" aria-label="删掉这一栏">${svg(P.close, 16)}</button></label>`).join('')}
       </div>
+      <button class="btn wide addbtn" data-act="mf-field-add">${svg(P.plus, 20, 2.2)}加一栏</button>
+      <div class="field-l">备注</div>
+      <textarea id="mf-note" class="note-input" data-mf="note" rows="3" placeholder="医院、疫苗、过敏…">${esc(f.note)}</textarea>
       <div class="field-l">分到哪一类</div>
       <div class="seg2">${Object.entries(KINDS).map(([k, l]) =>
         `<button data-act="mf-kind" data-v="${k}" class="${f.kind === k ? 'on' : ''}">${l}</button>`).join('')}</div>
@@ -1437,7 +1469,8 @@ function saveMember() {
   if (!name) { toast('请填写名字'); return; }
   const m = {
     id: f.id || uid(), kind: f.kind, name, photo: f.photo,
-    birth: f.birth || '', chip: f.chip.trim(), note: f.note.trim(),
+    birth: f.birth || '', weight: f.weight.trim(), chip: f.chip.trim(), note: f.note.trim(),
+    fields: f.fields.filter(x => x.label).map(x => ({ label: x.label, value: x.value })),
     createdAt: (state.members.get(f.id) || {}).createdAt || todayStr()
   };
   if (tooBig(m)) return;
@@ -1461,31 +1494,84 @@ function delMember() {
 }
 
 /* ---------- 成员主页：日历 ---------- */
-function calHtml(id, cal, filter) {
-  const [y, mo] = cal.split('-').map(Number);
-  const pad = new Date(y, mo - 1, 1).getDay();
-  const total = new Date(y, mo, 0).getDate();
-  const byDate = {};
-  [...state.logs.values()]
-    .filter(l => l.memberId === id && l.date.slice(0, 7) === cal && (!filter || l.symptomId === filter))
-    .forEach(l => { (byDate[l.date] = byDate[l.date] || []).push(l.symptomId); });
-  let cells = '';
-  for (let i = 0; i < pad; i++) cells += '<span class="cal-cell"></span>';
-  for (let d = 1; d <= total; d++) {
-    const date = `${y}-${pad2(mo)}-${pad2(d)}`;
-    const syms = [...new Set(byDate[date] || [])].slice(0, 3);
-    const cls = 'cal-cell day' + (state.calDay === date ? ' on' : '') + (date === todayStr() ? ' today' : '');
-    cells += `<button class="${cls}" data-act="cal-day" data-v="${date}">
-      <span class="num">${d}</span>
-      <span class="dots">${syms.map(sid => `<i style="background:${symColor(sid)}"></i>`).join('')}</span></button>`;
+function calRange(anchor, view) {
+  const d = parseYmd(anchor);
+  if (view === 'year') {
+    const y = d.getFullYear();
+    return { from: `${y}-01-01`, to: `${y}-12-31`, label: `${y} 年` };
   }
+  if (view === 'week') {
+    const start = new Date(d);
+    start.setDate(d.getDate() - d.getDay());
+    const end = new Date(start);
+    end.setDate(start.getDate() + 6);
+    return { from: ymd(start), to: ymd(end), label: `${start.getMonth() + 1}月${start.getDate()}日 – ${end.getMonth() + 1}月${end.getDate()}日` };
+  }
+  const y = d.getFullYear(), m = d.getMonth() + 1;
+  return { from: `${y}-${pad2(m)}-01`, to: `${y}-${pad2(m)}-${pad2(new Date(y, m, 0).getDate())}`, label: `${y} 年 ${m} 月` };
+}
+function dotsByDate(id, filter, from, to) {
+  const by = {};
+  [...state.logs.values()]
+    .filter(l => l.memberId === id && l.date >= from && l.date <= to && (!filter || l.symptomId === filter))
+    .forEach(l => { (by[l.date] = by[l.date] || []).push(l.symptomId); });
+  return by;
+}
+function dayCell(date, n, syms) {
+  const cls = 'cal-cell day' + (state.calDay === date ? ' on' : '') + (date === todayStr() ? ' today' : '');
+  return `<button class="${cls}" data-act="cal-day" data-v="${date}">
+    <span class="num">${n}</span>
+    <span class="dots">${syms.slice(0, 3).map(sid => `<i style="background:${symColor(sid)}"></i>`).join('')}</span></button>`;
+}
+function calHtml(id, anchor, view, filter) {
+  const r = calRange(anchor, view);
+  const by = dotsByDate(id, filter, r.from, r.to);
+  let grid = '';
+  if (view === 'month') {
+    const d = parseYmd(anchor);
+    const y = d.getFullYear(), m = d.getMonth() + 1;
+    const pad = new Date(y, m - 1, 1).getDay();
+    const total = new Date(y, m, 0).getDate();
+    grid = `<div class="cal-grid">${WEEK.map(w => `<span class="cal-w">${w}</span>`).join('')}`;
+    for (let i = 0; i < pad; i++) grid += '<span class="cal-cell"></span>';
+    for (let n = 1; n <= total; n++) {
+      const date = `${y}-${pad2(m)}-${pad2(n)}`;
+      grid += dayCell(date, n, [...new Set(by[date] || [])]);
+    }
+    grid += '</div>';
+  } else if (view === 'week') {
+    const start = parseYmd(r.from);
+    grid = '<div class="cal-grid week">';
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(start);
+      d.setDate(start.getDate() + i);
+      const date = ymd(d);
+      grid += `<div class="wk-col"><span class="cal-w">${WEEK[i]}</span>${dayCell(date, d.getDate(), [...new Set(by[date] || [])])}</div>`;
+    }
+    grid += '</div>';
+  } else {
+    const y = parseYmd(anchor).getFullYear();
+    grid = '<div class="cal-year">';
+    for (let m = 1; m <= 12; m++) {
+      const pre = `${y}-${pad2(m)}`;
+      const syms = [...new Set(Object.keys(by).filter(d => d.startsWith(pre)).flatMap(d => by[d]))];
+      const cnt = Object.keys(by).filter(d => d.startsWith(pre)).length;
+      grid += `<button class="yr-cell${cnt ? ' has' : ''}" data-act="cal-month" data-v="${pre}-01">
+        <span class="num">${m}</span>
+        <span class="dots">${syms.slice(0, 4).map(sid => `<i style="background:${symColor(sid)}"></i>`).join('')}</span></button>`;
+    }
+    grid += '</div>';
+  }
+  const seg = ['year', 'month', 'week'].map(v =>
+    `<button class="${state.calView === v ? 'on' : ''}" data-act="cal-view" data-v="${v}">${v === 'year' ? '年' : v === 'month' ? '月' : '周'}</button>`).join('');
   return `<div class="cal">
     <div class="cal-h">
-      <button class="icon-btn" data-act="cal-move" data-v="-1" aria-label="上个月">${svg(P.back, 20)}</button>
-      <b>${y} 年 ${mo} 月</b>
-      <button class="icon-btn" data-act="cal-move" data-v="1" aria-label="下个月">${svg(P.chev, 20)}</button>
+      <button class="icon-btn" data-act="cal-move" data-v="-1" aria-label="上一个">${svg(P.back, 20)}</button>
+      <b>${r.label}</b>
+      <button class="icon-btn" data-act="cal-move" data-v="1" aria-label="下一个">${svg(P.chev, 20)}</button>
+      <div class="cal-seg">${seg}</div>
     </div>
-    <div class="cal-grid">${WEEK.map(w => `<span class="cal-w">${w}</span>`).join('')}${cells}</div>
+    ${grid}
   </div>`;
 }
 function logRow(l) {
@@ -1504,8 +1590,9 @@ function viewMember(id) {
   const me = state.members.get(id);
   if (!me) return notFound();
   const logs = logsOf(id);
-  const cal = state.cal || todayStr().slice(0, 7);
+  const anchor = state.cal || todayStr();
   const filter = state.symFilter;
+  const range = calRange(anchor, state.calView);
   const symIds = [...new Set(logs.map(l => l.symptomId))];
   const chips = symIds.length ? `<nav class="pills">
       <button class="pill${filter ? '' : ' on'}" data-act="sym-filter" data-v="">全部 ${logs.length}</button>
@@ -1513,21 +1600,24 @@ function viewMember(id) {
         <i class="dot" style="background:${symColor(sid)}"></i>${esc(symName(sid))} ${logs.filter(l => l.symptomId === sid).length}</button>`).join('')}
     </nav>` : '';
   let shown = logs.filter(l => (!filter || l.symptomId === filter));
-  shown = state.calDay ? shown.filter(l => l.date === state.calDay) : shown.filter(l => l.date.slice(0, 7) === cal);
-  const listTitle = state.calDay ? `${dot(state.calDay)} 的记录` : `${Number(cal.slice(5))} 月记录`;
+  shown = state.calDay ? shown.filter(l => l.date === state.calDay)
+    : shown.filter(l => l.date >= range.from && l.date <= range.to);
+  const listTitle = state.calDay ? `${dot(state.calDay)} 的记录` : `${range.label}的记录`;
   return topbar(backBtn('#/health/' + me.kind), esc(me.name),
       `<a class="icon-btn" href="#/member/edit/${me.id}" aria-label="资料">${svg(P.edit)}</a>`) +
     `<section class="hero" style="padding-bottom:6px">
       ${avatarHtml(me, 'avatar big')}
       <div class="hero-b">
         ${me.birth ? `<p style="font-size:17px;color:var(--ink)">${ageText(me.birth)}</p>` : ''}
+        ${me.weight ? `<p style="font-size:14px">体重 ${esc(me.weight)}</p>` : ''}
         ${me.chip ? `<p style="font-size:13px">芯片 ${esc(me.chip)}</p>` : ''}
+        ${(me.fields || []).filter(x => x.value).map(x => `<p style="font-size:13px">${esc(x.label)} ${esc(x.value)}</p>`).join('')}
       </div>
     </section>
     ${me.note ? `<p class="mem-note">${esc(me.note)}</p>` : ''}
     ${chips}
     <main class="pad" style="padding-top:4px;padding-bottom:120px">
-      ${calHtml(id, cal, filter)}
+      ${calHtml(id, anchor, state.calView, filter)}
       <div class="sec-row"><h2 class="sec">${listTitle}</h2>
         ${state.calDay ? '<button class="link-btn" data-act="cal-day" data-v="">看整个月</button>' : ''}</div>
       ${shown.length ? `<div class="logs">${shown.map(logRow).join('')}</div>`
@@ -1537,6 +1627,71 @@ function viewMember(id) {
 }
 
 /* ---------- 一条记录 ---------- */
+function sectionsHtml(sym, values) {
+  const tplMode = !values;
+  return (sym.sections || []).map(sec => {
+    const v = tplMode ? null : values[sec.id];
+    let body = '';
+    if (sec.type === 'multi' || sec.type === 'single') {
+      let opts = listItems(sec.name);
+      const cur = tplMode ? [] : (sec.type === 'multi' ? (Array.isArray(v) ? v : []) : (v ? [v] : []));
+      opts = [...new Set([...opts, ...cur])];
+      body = `<div class="quick">
+        ${opts.map(o => `<button class="opt-chip${cur.includes(o) ? ' on' : ''}" data-act="opt" data-sec="${sec.id}" data-v="${esc(o)}"${tplMode ? ' disabled' : ''}>${cur.includes(o) ? svg(P.check, 15, 2.6) : ''}${esc(o)}</button>`).join('')}
+        <button class="opt-chip add" data-act="opt-add" data-sec="${sec.id}">+ 加一项</button></div>`;
+    } else if (sec.type === 'number') {
+      const n = Number(v || 0);
+      body = `<div class="stepper start">
+        <button data-act="sec-n" data-sec="${sec.id}" data-v="-1" aria-label="减少"${(tplMode || n <= 0) ? ' disabled' : ''}>${svg(P.minus, 20, 2.2)}</button>
+        <b class="num">${n}</b>
+        <button data-act="sec-n" data-sec="${sec.id}" data-v="1" aria-label="增加"${tplMode ? ' disabled' : ''}>${svg(P.plus, 20, 2.2)}</button></div>`;
+    } else {
+      body = `<input class="sec-input" type="text" data-sec="${sec.id}" placeholder="写点什么" value="${esc(v || '')}"${tplMode ? ' disabled' : ''}>`;
+    }
+    return `<div class="sec-block">
+      <div class="sec-head"><span>${esc(sec.name)}</span>
+        <button class="link-btn" data-act="sec-manage" data-sec="${sec.id}">管理</button></div>
+      ${body}</div>`;
+  }).join('');
+}
+
+/* ---------- 症状列表与模板 ---------- */
+function viewSymptoms() {
+  const syms = [...state.symptoms.values()];
+  const rows = syms.map(sy => {
+    const n = [...state.logs.values()].filter(l => l.symptomId === sy.id).length;
+    return `<a class="mem" href="#/symptom/${sy.id}">
+      <span class="sym-dot" style="background:${sy.color}"></span>
+      <div class="mem-b"><b>${esc(sy.name)}</b><small>${(sy.sections || []).length} 个板块 · ${n} 条记录</small></div>
+      ${svg(P.chev, 20)}</a>`;
+  }).join('');
+  return topbar(backBtn('#/health/cat'), '症状', '') +
+    `<main class="pad">
+      ${syms.length ? `<div class="mems">${rows}</div>` : '<p class="hint" style="text-align:center">还没有症状</p>'}
+      <button class="btn wide addbtn" data-act="new-sym-page">${svg(P.plus, 20, 2.2)}新症状</button>
+      <p class="hint">症状是所有成员共用的。在这里改了板块和选项，之后每条记录都按这个样子来。</p>
+    </main>`;
+}
+function viewSymptom(id) {
+  const sy = state.symptoms.get(id);
+  if (!sy) return notFound();
+  tpl = id;
+  const n = [...state.logs.values()].filter(l => l.symptomId === id).length;
+  return topbar(backBtn('#/symptoms'), esc(sy.name), '') +
+    `<main class="pad form">
+      <div class="card">
+        <button class="line btn-line" data-act="sym-rename" data-id="${id}"><span>名字</span><span>${esc(sy.name)}</span></button>
+        <div class="line"><span>颜色</span>
+          <div class="colors">${SYM_COLORS.map(c => `<button class="swatch${c === sy.color ? ' on' : ''}" style="background:${c}" data-act="sym-color" data-id="${id}" data-v="${encodeURIComponent(c)}" aria-label="换颜色"></button>`).join('')}</div>
+        </div>
+      </div>
+      <p class="hint">下面就是记录这个症状时会看到的样子</p>
+      ${sectionsHtml(sy, null)}
+      <button class="btn wide addbtn" data-act="sec-add">${svg(P.plus, 20, 2.2)}加一个板块</button>
+      <button class="btn danger wide" data-act="sym-del" data-id="${id}">删除这个症状${n ? `（连同 ${n} 条记录）` : ''}</button>
+    </main>`;
+}
+
 function viewLog(mode, arg) {
   const key = 'l:' + mode + ':' + arg;
   if (!lf || lf.key !== key) {
@@ -1561,31 +1716,8 @@ function viewLog(mode, arg) {
     ${syms.map(s => `<button class="opt-chip${s.id === lf.symptomId ? ' on' : ''}" data-act="pick-sym" data-v="${s.id}" style="${s.id === lf.symptomId ? `background:${s.color};border-color:${s.color};color:#fff` : ''}">${esc(s.name)}</button>`).join('')}
     <button class="opt-chip add" data-act="new-sym">+ 新症状</button></div>`;
 
-  const sections = sym ? (sym.sections || []).map(sec => {
-    const v = lf.values[sec.id];
-    let body = '';
-    if (sec.type === 'multi' || sec.type === 'single') {
-      let opts = listItems(sec.name);
-      if (sec.name === '用药') opts = [...new Set([...opts, ...medNames()])];
-      const cur = sec.type === 'multi' ? (Array.isArray(v) ? v : []) : (v ? [v] : []);
-      opts = [...new Set([...opts, ...cur])];
-      body = `<div class="quick">
-        ${opts.map(o => `<button class="opt-chip${cur.includes(o) ? ' on' : ''}" data-act="opt" data-sec="${sec.id}" data-v="${esc(o)}">${cur.includes(o) ? svg(P.check, 15, 2.6) : ''}${esc(o)}</button>`).join('')}
-        <button class="opt-chip add" data-act="opt-add" data-sec="${sec.id}">+ 加一项</button></div>`;
-    } else if (sec.type === 'number') {
-      const n = Number(v || 0);
-      body = `<div class="stepper start">
-        <button data-act="sec-n" data-sec="${sec.id}" data-v="-1" aria-label="减少"${n <= 0 ? ' disabled' : ''}>${svg(P.minus, 20, 2.2)}</button>
-        <b class="num">${n}</b>
-        <button data-act="sec-n" data-sec="${sec.id}" data-v="1" aria-label="增加">${svg(P.plus, 20, 2.2)}</button></div>`;
-    } else {
-      body = `<input class="sec-input" type="text" data-sec="${sec.id}" placeholder="写点什么" value="${esc(v || '')}">`;
-    }
-    return `<div class="sec-block">
-      <div class="sec-head"><span>${esc(sec.name)}</span>
-        <button class="link-btn" data-act="sec-manage" data-sec="${sec.id}">管理</button></div>
-      ${body}</div>`;
-  }).join('') : '';
+  const sections = sym ? sectionsHtml(sym, lf.values) : '';
+
 
   const photos = `<div class="photos">
     ${lf.photos.map((p, i) => `<button class="photo-thumb" data-act="lphoto-menu" data-i="${i}" aria-label="第 ${i + 1} 张照片"><img src="${esc(p)}" alt=""></button>`).join('')}
@@ -1606,7 +1738,7 @@ function viewLog(mode, arg) {
       ${sections}
       ${sym ? `<button class="btn wide addbtn" data-act="sec-add">${svg(P.plus, 20, 2.2)}加一个板块</button>` : '<p class="hint">先选一个症状，下面才会出现要填的内容</p>'}
       <div class="field-l">备注</div>
-      <div class="card"><label class="line"><span></span><textarea id="lf-note" data-lf="note" rows="2" placeholder="随便写点什么">${esc(lf.note)}</textarea></label></div>
+      <textarea id="lf-note" class="note-input" data-lf="note" rows="3" placeholder="随便写点什么">${esc(lf.note)}</textarea>
       <div class="field-l">照片</div>
       ${photos}
       <button class="btn primary wide" data-act="save-log">保存</button>
@@ -1666,21 +1798,26 @@ function addSectionFlow() {
   });
 }
 function manageSection(secId) {
-  const sym = symOf(lf.symptomId);
+  const sym = symOf(activeSymId());
   const sec = (sym.sections || []).find(x => x.id === secId);
   if (!sec) return;
-  const opts = (sec.type === 'multi' || sec.type === 'single') ? listItems(sec.name) : [];
+  const chips = (sec.type === 'multi' || sec.type === 'single');
+  const opts = chips ? listItems(sec.name) : [];
+  const fromBox = chips ? medNames().filter(n => !opts.includes(n)) : [];
   showLayer(`<div class="scrim" data-act="close"></div>
     <div class="sheet menu-sheet" role="dialog" aria-label="管理板块">
       <h2 class="sheet-t">${esc(sec.name)}</h2>
       ${opts.length ? opts.map(o => `<button data-act="opt-del" data-sec="${sec.id}" data-v="${esc(o)}"><span>${esc(o)}</span><span class="danger">删除</span></button>`).join('')
-        : '<p>这个板块没有可删的选项</p>'}
+        : '<p>这个板块还没有选项</p>'}
+      ${chips ? `<button data-act="opt-add" data-sec="${sec.id}"><span class="accent-t">+ 自己写一项</span></button>` : ''}
+      ${fromBox.length ? `<p style="margin-top:10px">从药箱里挑</p>
+        <div class="quick" style="padding-bottom:8px">${fromBox.map(n => `<button class="opt-chip add" data-act="opt-from-box" data-sec="${sec.id}" data-v="${esc(n)}">+ ${esc(n)}</button>`).join('')}</div>` : ''}
       <button class="danger" data-act="sec-del" data-sec="${sec.id}">删除整个板块</button>
       <button data-act="close">完成</button>
     </div>`);
 }
 function sectionAdd(name, type) {
-  const sym = clone(symOf(lf.symptomId));
+  const sym = clone(symOf(activeSymId()));
   sym.sections = sym.sections || [];
   sym.sections.push({ id: uid(), name, type });
   saveDoc('symptoms', sym);
@@ -1708,6 +1845,8 @@ function renderView() {
     else if (a === 'member' && b === 'new') html = viewMemberForm('new', c);
     else if (a === 'member' && b === 'edit') html = viewMemberForm('edit', c);
     else if (a === 'member') html = viewMember(b);
+    else if (a === 'symptoms') html = viewSymptoms();
+    else if (a === 'symptom') html = viewSymptom(b);
     else if (a === 'log' && b === 'new') html = viewLog('new', c);
     else if (a === 'log') html = viewLog('edit', b);
     else if (a === 'settings') html = viewSettings();
@@ -1825,6 +1964,14 @@ const actions = {
   'cancel-member': el => { const to = el.dataset.to; mform = null; if (cameFrom === to) history.back(); else goReplace(to); },
   'cancel-log': el => { const to = el.dataset.to; lf = null; if (cameFrom === to) history.back(); else goReplace(to); },
   'mf-kind': el => { mform.kind = el.dataset.v; render(); },
+  'mf-field-add': () => askText('加一栏叫什么', '比如 医院、疫苗', label => { mform.fields.push({ label, value: '' }); render(); }),
+  'mf-field-del': el => { mform.fields.splice(Number(el.dataset.i), 1); render(); },
+  'opt-from-box': el => {
+    const sym = symOf(activeSymId());
+    const sec = (sym.sections || []).find(x => x.id === el.dataset.sec);
+    addListItem(sec.name, el.dataset.v);
+    manageSection(sec.id);
+  },
   'save-member': saveMember,
   'del-member': delMember,
   'pick-mphoto': () => { photoPending = { target: 'member' }; document.getElementById('mphoto-in').click(); },
@@ -1849,13 +1996,17 @@ const actions = {
   },
   'lph-del': el => { lf.photos.splice(Number(el.dataset.i), 1); closeLayer(); render(); },
   'cal-move': el => {
-    const cal = state.cal || todayStr().slice(0, 7);
-    const [y, m] = cal.split('-').map(Number);
-    const d = new Date(y, m - 1 + Number(el.dataset.v), 1);
-    state.cal = d.getFullYear() + '-' + pad2(d.getMonth() + 1);
+    const step = Number(el.dataset.v);
+    const d = parseYmd(state.cal || todayStr());
+    if (state.calView === 'week') d.setDate(d.getDate() + step * 7);
+    else if (state.calView === 'year') d.setFullYear(d.getFullYear() + step);
+    else d.setMonth(d.getMonth() + step, 1);
+    state.cal = ymd(d);
     state.calDay = '';
     render();
   },
+  'cal-view': el => { state.calView = el.dataset.v; state.calDay = ''; render(); },
+  'cal-month': el => { state.cal = el.dataset.v; state.calView = 'month'; state.calDay = ''; render(); },
   'cal-day': el => {
     const v = el.dataset.v;
     state.calDay = (v && state.calDay !== v) ? v : '';
@@ -1863,8 +2014,31 @@ const actions = {
   },
   'sym-filter': el => { state.symFilter = el.dataset.v; render(); },
   'pick-sym': el => { lf.symptomId = el.dataset.v; render(); },
+  'new-sym-page': () => askText('新症状叫什么', '比如 呕吐、软便', name => {
+    const sy = newSymptom(name);
+    location.hash = '#/symptom/' + sy.id;
+  }),
+  'sym-rename': el => {
+    const sy = clone(state.symptoms.get(el.dataset.id));
+    askText('改名字', sy.name, name => { sy.name = name; saveDoc('symptoms', sy); });
+  },
+  'sym-color': el => {
+    const sy = clone(state.symptoms.get(el.dataset.id));
+    sy.color = decodeURIComponent(el.dataset.v);
+    saveDoc('symptoms', sy);
+  },
+  'sym-del': el => {
+    const sy = state.symptoms.get(el.dataset.id);
+    const logs = [...state.logs.values()].filter(l => l.symptomId === sy.id);
+    if (!confirm(`删除症状「${sy.name}」？${logs.length ? `这会连同 ${logs.length} 条记录一起删掉，` : ''}不能恢复。`)) return;
+    logs.forEach(l => delDoc('logs', l.id));
+    tpl = null;
+    delDoc('symptoms', sy.id);
+    goReplace('#/symptoms');
+  },
   'new-sym': () => askText('新症状叫什么', '比如 呕吐、疱疹', name => { lf.symptomId = newSymptom(name).id; render(); }),
   opt: el => {
+    if (!lf) return;
     const sym = symOf(lf.symptomId);
     const sec = (sym.sections || []).find(x => x.id === el.dataset.sec);
     const v = el.dataset.v;
@@ -1878,10 +2052,12 @@ const actions = {
   },
   'opt-add': el => {
     const secId = el.dataset.sec;
-    const sym = symOf(lf.symptomId);
+    const sym = symOf(activeSymId());
     const sec = (sym.sections || []).find(x => x.id === secId);
+    if (el.closest('.menu-sheet')) closeLayer();
     askText('加一项：' + sec.name, '写上名字', v => {
       addListItem(sec.name, v);
+      if (!lf) { render(); return; }
       if (sec.type === 'multi') {
         const cur = Array.isArray(lf.values[sec.id]) ? lf.values[sec.id].slice() : [];
         lf.values[sec.id] = cur.concat(v);
@@ -1890,7 +2066,7 @@ const actions = {
     });
   },
   'opt-del': el => {
-    const sym = symOf(lf.symptomId);
+    const sym = symOf(activeSymId());
     const sec = (sym.sections || []).find(x => x.id === el.dataset.sec);
     delListItem(sec.name, el.dataset.v);
     manageSection(sec.id);
@@ -1904,7 +2080,7 @@ const actions = {
   'sec-add': addSectionFlow,
   'sec-type': el => sectionAdd(el.dataset.name, el.dataset.v),
   'sec-del': el => {
-    const sym = clone(symOf(lf.symptomId));
+    const sym = clone(symOf(activeSymId()));
     sym.sections = (sym.sections || []).filter(x => x.id !== el.dataset.sec);
     saveDoc('symptoms', sym);
     closeLayer();
@@ -1944,6 +2120,7 @@ document.addEventListener('input', e => {
     if (t.tagName === 'TEXTAREA') grow(t);
     return;
   }
+  if (t.dataset.mfx && mform) { mform.fields[Number(t.dataset.mfx)].value = t.value; return; }
   if (t.dataset.lf && lf) {
     lf[t.dataset.lf] = t.value;
     if (t.tagName === 'TEXTAREA') grow(t);
@@ -2023,6 +2200,7 @@ window.addEventListener('hashchange', () => {
   if (r[0] !== 'add' && r[0] !== 'edit') form = null;
   if (r[0] !== 'member' || (r[1] !== 'new' && r[1] !== 'edit')) mform = null;
   if (r[0] !== 'log') lf = null;
+  if (r[0] !== 'symptom') tpl = null;
   if (r[0] !== 'member' && r[0] !== 'log') { state.cal = ''; state.calDay = ''; state.symFilter = ''; }
   state.search = '';
   state.searchOpen = false;
