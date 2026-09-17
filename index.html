@@ -99,6 +99,13 @@ button:disabled{opacity:.4;cursor:default}
 .tags{display:flex;flex-wrap:wrap;gap:4px}
 .tag{font-size:12px;padding:1px 8px;border-radius:8px;background:var(--accent-soft);color:var(--accent);border:0}
 button.tag{height:34px;padding:0 12px;font-size:14px;border-radius:10px;display:inline-flex;align-items:center;gap:4px}
+.exp-bar{display:flex;align-items:center;gap:14px;width:100%;padding:14px 0;border:0;border-bottom:1px solid var(--line);background:none;color:var(--bad)}
+.exp-thumbs{display:flex;align-items:center;flex-shrink:0}
+.exp-thumbs img,.exp-ph{width:44px;height:44px;border-radius:12px;object-fit:cover;margin-right:-14px;border:2px solid var(--bg);background:var(--ph);display:flex;align-items:center;justify-content:center;color:var(--muted)}
+.exp-thumbs>:last-child{margin-right:0}
+.exp-t{flex:1;text-align:left;font-size:16px;font-weight:600;padding-left:14px}
+.exp-bar svg{transition:transform .2s;flex-shrink:0}
+.exp-bar.open svg{transform:rotate(90deg)}
 .empty{text-align:center;color:var(--muted);padding:48px 0}
 .fab{position:fixed;right:max(20px,calc(50% - 260px));bottom:calc(env(safe-area-inset-bottom) + 24px);width:60px;height:60px;border-radius:30px;background:var(--accent);color:var(--accent-ink);display:flex;align-items:center;justify-content:center;box-shadow:0 6px 16px rgba(20,40,30,.25)}
 
@@ -253,7 +260,7 @@ const BOXES = { human: '人用药', cat: '猫用药' };
 const REMIND_OPTIONS = [30, 60, 120];
 const LOG_TEXT = { add: '添加', in: '入库', use: '用完', open: '开封' };
 const FB_VER = '10.12.2';
-const APP_VER = '2026.09.17-10';
+const APP_VER = '2026.09.17-11';
 const MAX_PHOTOS = 6;
 const PHOTO_PX = 640;
 const PHOTO_Q = 0.62;
@@ -262,7 +269,7 @@ const $app = document.getElementById('app');
 const $layer = document.getElementById('layer');
 const $toast = document.getElementById('toast');
 
-const state = { meds: new Map(), ready: false, user: null, search: '', searchOpen: false };
+const state = { meds: new Map(), ready: false, user: null, search: '', searchOpen: false, expiredOpen: false };
 let store = null;
 let sheet = null;
 let form = null;
@@ -521,6 +528,19 @@ function viewBox(box, kind, val) {
   const q = state.search.trim().toLowerCase();
   if (q) list = list.filter(m => [m.name, m.spec, ...(m.tags || [])].join(' ').toLowerCase().includes(q));
   list = list.slice().sort(byExp);
+  let expired = [];
+  if (val !== 'expired') {
+    expired = list.filter(isBad);
+    list = list.filter(m => !isBad(m));
+  }
+  const expBar = expired.length ? `<button class="exp-bar${state.expiredOpen ? ' open' : ''}" data-act="toggle-expired">
+      <span class="exp-thumbs">${expired.slice(0, 4).map(m => {
+        const p = photosOf(m)[0];
+        return p ? `<img src="${esc(p)}" alt="">` : `<span class="exp-ph">${svg(P.bottle, 18, 1.6)}</span>`;
+      }).join('')}</span>
+      <span class="exp-t">已过期 ${expired.length} 种</span>
+      ${svg(P.chev, 20)}
+    </button>${state.expiredOpen ? expired.map(medRow).join('') : ''}` : '';
 
   const base = '#/box/' + box;
   const pill = (href, label, on) => `<a class="pill${on ? ' on' : ''}" href="${href}">${label}</a>`;
@@ -532,7 +552,7 @@ function viewBox(box, kind, val) {
       (cnt.expired ? pill(base + '/f/expired', `已过期 ${cnt.expired}`, val === 'expired') : '');
   const search = state.searchOpen
     ? `<div class="searchbar"><input id="q" type="search" placeholder="搜索名称、规格、分类" value="${esc(state.search)}" autocomplete="off"></div>` : '';
-  const rows = list.length ? list.map(medRow).join('')
+  const rows = (list.length || expired.length) ? expBar + list.map(medRow).join('')
     : `<p class="empty">${all.length ? '没有符合的药品' : '还没有药品，点右下角 + 添加'}</p>`;
   return topbar(
     `<button class="icon-btn" data-act="drawer" data-box="${box}" aria-label="菜单">${svg(P.menu)}</button>`,
@@ -1296,6 +1316,7 @@ const actions = {
   'open-date-save': () => setOpened(openEdit.date),
   'open-date-clear': () => setOpened(null),
   'close-open-date': () => { openEdit = null; closeLayer(); },
+  'toggle-expired': () => { state.expiredOpen = !state.expiredOpen; render(); },
   'f-row-add': () => { form.rows.push({ exp: '', qty: 1 }); render(); },
   'f-row-del': el => { form.rows.splice(Number(el.dataset.i), 1); render(); },
   'pick-photo': () => {
@@ -1400,6 +1421,7 @@ window.addEventListener('hashchange', () => {
   if (r[0] !== 'add' && r[0] !== 'edit') form = null;
   state.search = '';
   state.searchOpen = false;
+  state.expiredOpen = false;
   closeLayer();
   renderView();
   window.scrollTo(0, 0);
