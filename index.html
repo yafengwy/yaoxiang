@@ -1,0 +1,1079 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="药箱">
+<meta name="theme-color" content="#EEF1EC">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-192.png">
+<title>家庭药箱</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#EEF1EC; --card:#FFFFFF; --ink:#1D2320; --muted:#5A635E; --line:#DDE2DC;
+  --accent:#2E6A4C; --accent-ink:#FFFFFF; --accent-soft:#DDEBE2;
+  --warn:#8A4F00; --warn-soft:#FBE8CC; --bad:#A8261C; --bad-soft:#F8DEDB;
+  --ph:#E1E7E0; --scrim:rgba(20,26,23,.45);
+  color-scheme:light dark;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#121614; --card:#1C221F; --ink:#E8EDEA; --muted:#9AA59F; --line:#2C3430;
+    --accent:#5FB38A; --accent-ink:#0E1411; --accent-soft:#1F3A2D;
+    --warn:#F0B35A; --warn-soft:#3A2B14; --bad:#F08A80; --bad-soft:#3A1C19;
+    --ph:#2A322E; --scrim:rgba(0,0,0,.6);
+  }
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Noto Sans SC",sans-serif;background:var(--bg);color:var(--ink);font-size:16px;line-height:1.45;-webkit-tap-highlight-color:transparent}
+a{color:var(--accent);text-decoration:none}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer}
+button:disabled{opacity:.4;cursor:default}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+#app{max-width:560px;margin:0 auto;min-height:100vh}
+.num{font-family:"Barlow Condensed","DIN Condensed","Arial Narrow",sans-serif;font-weight:600;font-variant-numeric:tabular-nums}
+.muted{color:var(--muted)}
+
+.top{position:sticky;top:0;z-index:5;display:grid;grid-template-columns:88px 1fr 88px;align-items:center;padding:calc(env(safe-area-inset-top) + 6px) 8px 6px;background:var(--bg)}
+.top-t{margin:0;text-align:center;font-size:18px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.top-r{display:flex;justify-content:flex-end}
+.icon-btn{width:44px;height:44px;display:inline-flex;align-items:center;justify-content:center;border:0;background:none;color:var(--ink);border-radius:12px;padding:0}
+.text-btn{border:0;background:none;color:var(--accent);font-size:16px;min-height:44px;padding:0 8px;display:inline-flex;align-items:center}
+
+.pad{padding:8px 20px 40px}
+.big{margin:12px 0 4px;font-size:34px;font-weight:700;letter-spacing:.02em}
+.sec{margin:24px 4px 10px;font-size:14px;font-weight:500;color:var(--muted)}
+.sec-row{display:flex;justify-content:space-between;align-items:baseline;margin:24px 4px 10px;font-size:14px}
+.sec-row .sec{margin:0}
+.sec-row .num{font-size:26px;line-height:1;margin:0 2px}
+.card{background:var(--card);border-radius:18px;padding:0 18px}
+
+.tiles{display:flex;flex-direction:column;gap:14px;margin-top:24px}
+.tile{display:flex;align-items:center;gap:16px;padding:20px;background:var(--card);border-radius:22px;color:var(--ink)}
+.tile>svg{color:var(--muted);flex-shrink:0}
+.tile-ic{width:60px;height:60px;border-radius:18px;background:var(--accent-soft);color:var(--accent);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.tile-b{flex:1;display:flex;flex-direction:column;gap:4px;min-width:0}
+.tile-t{font-size:22px;font-weight:700}
+.tile-s{font-size:14px;color:var(--muted);display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.chip{display:inline-block;font-size:12px;font-style:normal;padding:2px 8px;border-radius:999px;background:var(--bg);color:var(--muted);white-space:nowrap}
+.chip.ok{background:var(--accent-soft);color:var(--accent)}
+.chip.warn{background:var(--warn-soft);color:var(--warn)}
+.chip.bad{background:var(--bad-soft);color:var(--bad)}
+
+.mini{display:flex;align-items:center;gap:12px;padding:14px 0;color:var(--ink);border-bottom:1px solid var(--line)}
+.mini:last-child{border-bottom:0}
+.mini-b{flex:1;display:flex;flex-direction:column;min-width:0}
+.mini-b small{color:var(--muted);font-size:13px}
+
+.days{display:flex;align-items:baseline;gap:2px;flex-shrink:0;font-size:13px;white-space:nowrap}
+.days .num{font-size:32px;line-height:1}
+.st-ok{color:var(--accent)} .st-warn{color:var(--warn)} .st-bad{color:var(--bad)} .st-empty{color:var(--muted)}
+.warn-t{color:var(--warn)}
+
+.searchbar{padding:0 20px 8px}
+.searchbar input{width:100%;height:44px;border:0;border-radius:22px;background:var(--card);padding:0 16px;font-size:16px}
+.pills{display:flex;gap:8px;padding:4px 20px 8px;overflow-x:auto;scrollbar-width:none}
+.pills::-webkit-scrollbar{display:none}
+.pill{flex-shrink:0;height:36px;padding:0 14px;border-radius:999px;border:1px solid var(--line);background:var(--card);color:var(--ink);font-size:14px;display:inline-flex;align-items:center;gap:4px}
+.pill.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+
+.list{padding:0 20px 120px}
+.row{display:flex;align-items:center;gap:14px;padding:12px 0;border-bottom:1px solid var(--line);color:var(--ink)}
+.row.dim{opacity:.55}
+.thumb{width:64px;height:64px;border-radius:16px;object-fit:cover;flex-shrink:0}
+.ph{background:var(--ph);color:var(--muted);display:flex;align-items:center;justify-content:center}
+.row-b{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.row-t{display:flex;align-items:baseline;gap:8px;min-width:0}
+.row-t b{font-size:17px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row-t small{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row-s{font-size:13px;color:var(--muted)}
+.tags{display:flex;flex-wrap:wrap;gap:4px}
+.tag{font-size:12px;padding:1px 8px;border-radius:8px;background:var(--accent-soft);color:var(--accent);border:0}
+button.tag{height:34px;padding:0 12px;font-size:14px;border-radius:10px;display:inline-flex;align-items:center;gap:4px}
+.empty{text-align:center;color:var(--muted);padding:48px 0}
+.fab{position:fixed;right:max(20px,calc(50% - 260px));bottom:calc(env(safe-area-inset-bottom) + 24px);width:60px;height:60px;border-radius:30px;background:var(--accent);color:var(--accent-ink);display:flex;align-items:center;justify-content:center;box-shadow:0 6px 16px rgba(20,40,30,.25)}
+
+.hero{display:flex;gap:16px;align-items:center;padding:8px 20px 12px}
+.hero-img{width:112px;height:112px;border-radius:20px;object-fit:cover;flex-shrink:0;display:flex}
+.hero-btn{border:0;padding:0;background:none;border-radius:20px;flex-shrink:0}
+.hero-b{display:flex;flex-direction:column;gap:6px;align-items:flex-start;min-width:0}
+.hero-b h2{margin:0;font-size:26px;line-height:1.2;word-break:break-word}
+.hero-b p{margin:0;color:var(--muted);font-size:15px}
+.detail{padding-bottom:130px}
+
+.line{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:54px;border-bottom:1px solid var(--line);width:100%}
+.card>.line:last-child{border-bottom:0}
+.line>span:first-child{font-weight:500;flex-shrink:0}
+.line input,.line select{flex:1;min-width:0;text-align:right;border:0;background:none;font-size:16px;padding:8px 0;-webkit-appearance:none;appearance:none}
+.line input::-webkit-date-and-time-value{text-align:right}
+.line input::placeholder,.tagbox input::placeholder,.searchbar input::placeholder{color:var(--muted);opacity:.8}
+.btn-line{border:0;background:none;color:var(--accent);font-size:16px;text-align:left;padding:0}
+
+.batch{background:var(--card);border-radius:18px;padding:14px 18px;margin-bottom:10px;display:flex;flex-direction:column;gap:6px}
+.batch-h{display:flex;justify-content:space-between;align-items:baseline;font-size:17px}
+.batch-m{display:flex;align-items:center;gap:10px;font-size:15px}
+.link-btn{align-self:flex-start;border:0;background:none;color:var(--accent);font-size:14px;padding:4px 0;display:inline-flex;align-items:center;gap:6px;min-height:36px}
+.log{display:flex;gap:14px;padding:12px 0;border-bottom:1px solid var(--line);font-size:15px}
+.log:last-child{border-bottom:0}
+.log-d{color:var(--muted);flex-shrink:0;font-variant-numeric:tabular-nums}
+.log small{color:var(--muted)}
+.foot{text-align:center;color:var(--muted);font-size:13px;margin-top:20px}
+
+.bottombar{position:fixed;left:0;right:0;bottom:0;z-index:4;background:var(--card);border-top:1px solid var(--line);padding:12px 20px calc(env(safe-area-inset-bottom) + 12px);display:flex;align-items:center;justify-content:space-between;max-width:560px;margin:0 auto}
+.remain{color:var(--muted);font-size:14px;display:flex;align-items:baseline;gap:6px}
+.remain .num{font-size:36px;line-height:1;color:var(--ink)}
+
+.btn{height:50px;padding:0 22px;border-radius:25px;border:1px solid var(--line);background:var(--card);font-size:17px;font-weight:600}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.danger{color:var(--bad);background:none;border-color:transparent}
+.btn.wide{width:100%;margin-top:14px;display:block}
+.hint{font-size:13px;color:var(--muted);margin:8px 4px 0}
+.field-l{font-size:14px;font-weight:500;color:var(--muted);margin:20px 4px 8px}
+
+.form .card{margin-top:16px}
+.photo-pick{width:100%;height:160px;border-radius:20px;border:1.5px dashed var(--line);background:var(--card);color:var(--muted);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;overflow:hidden;padding:0}
+.photo-pick svg{color:var(--accent)}
+.photo-pick img{width:100%;height:100%;object-fit:cover}
+.tagbox{display:flex;flex-wrap:wrap;gap:6px;align-items:center;background:var(--card);border-radius:14px;padding:8px 10px;min-height:52px}
+.tagbox input{flex:1;min-width:140px;border:0;background:none;font-size:16px;height:36px}
+.quick{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.seg2,.seg3{display:grid;gap:8px}
+.seg2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.seg3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.seg2 button,.seg3 button{height:48px;border-radius:14px;border:1px solid var(--line);background:var(--card);font-size:15px;font-weight:600;padding:0 4px}
+.seg2 .on,.seg3 .on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+
+#layer{position:fixed;inset:0;z-index:20;display:none}
+#layer.open{display:block}
+.scrim{position:absolute;inset:0;background:var(--scrim)}
+.sheet{position:absolute;left:0;right:0;bottom:0;max-width:560px;margin:0 auto;background:var(--card);border-radius:26px 26px 0 0;padding:18px 20px calc(env(safe-area-inset-bottom) + 20px);max-height:90vh;overflow-y:auto}
+.sheet-t{margin:4px 0 8px;font-size:20px}
+.sheet p{margin:0 0 4px;color:var(--muted)}
+.anim .sheet{animation:up .22s ease-out}
+.anim .drawer{animation:slide .22s ease-out}
+@keyframes up{from{transform:translateY(40px);opacity:0}}
+@keyframes slide{from{transform:translateX(-40px);opacity:0}}
+@media (prefers-reduced-motion:reduce){.anim .sheet,.anim .drawer{animation:none}}
+.sheet-h{display:flex;align-items:center;gap:12px;margin-bottom:8px}
+.seg{display:flex;gap:4px;padding:4px;background:var(--bg);border-radius:14px;flex-shrink:0}
+.seg button{height:40px;padding:0 16px;border:0;border-radius:10px;background:none;color:var(--muted);font-size:16px;font-weight:600}
+.seg button.on{background:var(--card);color:var(--ink)}
+.change{flex:1;display:flex;align-items:center;gap:6px;font-size:28px}
+.change svg{color:var(--muted)}
+.opts{display:flex;flex-direction:column;gap:8px}
+.opt{display:flex;justify-content:space-between;align-items:center;gap:8px;min-height:50px;padding:0 14px;border-radius:14px;border:1px solid var(--line);background:var(--card);text-align:left;font-size:15px}
+.opt span:last-child{color:var(--muted);font-size:14px}
+.opt.on{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.stepper{display:flex;align-items:center;gap:16px}
+.stepper button{width:44px;height:44px;border-radius:22px;border:1px solid var(--line);background:var(--card);color:var(--accent);display:flex;align-items:center;justify-content:center;padding:0}
+.stepper .num{min-width:28px;text-align:center;font-size:26px}
+.actions2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:18px}
+
+.drawer{position:absolute;top:0;bottom:0;left:0;width:min(300px,82vw);background:var(--card);padding:calc(env(safe-area-inset-top) + 16px) 12px 24px;overflow-y:auto;display:flex;flex-direction:column}
+.drawer h2{margin:8px 12px 12px;font-size:22px}
+.drawer h3{margin:20px 12px 6px;font-size:13px;color:var(--muted);font-weight:500}
+.drawer a{display:flex;justify-content:space-between;align-items:center;min-height:48px;padding:0 12px;border-radius:12px;color:var(--ink);font-size:16px;flex-shrink:0}
+.drawer a span{color:var(--muted);font-size:14px}
+.drawer hr{border:0;border-top:1px solid var(--line);margin:16px 12px;width:auto}
+.drawer p{margin:4px 12px;font-size:13px}
+
+.viewer{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:20px;border:0;background:none;width:100%}
+.viewer img{max-width:100%;max-height:100%;border-radius:12px}
+
+#toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom) + 100px);transform:translate(-50%,20px);background:var(--ink);color:var(--bg);padding:10px 18px;border-radius:12px;font-size:15px;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:30;max-width:86vw;text-align:center}
+#toast.show{opacity:1;transform:translate(-50%,0)}
+.login{padding-top:calc(env(safe-area-inset-top) + 60px)}
+.login .card{margin-top:24px}
+.login .text-btn{display:flex;margin:12px auto 0}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="layer"></div>
+<div id="toast" role="status" aria-live="polite"></div>
+<script>
+'use strict';
+
+/* ================= 云同步设置 =================
+   不填：数据保存在这台手机上。
+   填上 Firebase 配置：自动变成云同步，需要邮箱登录（见 设置说明.md）。
+   例：
+   const FIREBASE_CONFIG = {
+     apiKey: "...",
+     authDomain: "...",
+     projectId: "...",
+     appId: "..."
+   };
+*/
+const FIREBASE_CONFIG = null;
+/* ============================================ */
+
+const BOXES = { human: '人用药', cat: '猫用药' };
+const REMIND_OPTIONS = [30, 60, 120];
+const LOG_TEXT = { add: '添加', in: '入库', use: '用完', open: '开封' };
+const FB_VER = '10.12.2';
+
+const $app = document.getElementById('app');
+const $layer = document.getElementById('layer');
+const $toast = document.getElementById('toast');
+
+const state = { meds: new Map(), ready: false, user: null, search: '', searchOpen: false };
+let store = null;
+let sheet = null;
+let form = null;
+
+/* ---------- 工具 ---------- */
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+const clone = o => JSON.parse(JSON.stringify(o));
+const pad2 = n => String(n).padStart(2, '0');
+const ymd = d => d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
+const todayStr = () => ymd(new Date());
+const parseYmd = s => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
+const daysUntil = s => Math.round((parseYmd(s) - parseYmd(todayStr())) / 86400000);
+const addDays = (s, n) => { const d = parseYmd(s); d.setDate(d.getDate() + n); return ymd(d); };
+const dot = s => (s ? s.replace(/-/g, '.') : '');
+
+function toast(msg) {
+  $toast.textContent = msg;
+  $toast.classList.add('show');
+  clearTimeout(toast.t);
+  toast.t = setTimeout(() => $toast.classList.remove('show'), 2600);
+}
+
+function svg(paths, size, sw) {
+  return `<svg width="${size || 22}" height="${size || 22}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${sw || 2}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths}</svg>`;
+}
+const P = {
+  back: '<path d="M15 6l-6 6 6 6"/>',
+  chev: '<path d="M9 6l6 6-6 6"/>',
+  arrow: '<path d="M5 12h14M13 6l6 6-6 6"/>',
+  menu: '<path d="M4 7h16M4 12h16M4 17h16"/>',
+  search: '<circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4-4"/>',
+  edit: '<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>',
+  minus: '<path d="M5 12h14"/>',
+  close: '<path d="M6 6l12 12M18 6L6 18"/>',
+  cal: '<rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/>',
+  gear: '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M2 12h3M19 12h3M4.9 19.1L7 17M17 7l2.1-2.1"/>',
+  cat: '<path d="M5 3l3.5 5h7L19 3v10a7 7 0 0 1-14 0z"/><circle cx="9.5" cy="12.5" r=".6"/><circle cx="14.5" cy="12.5" r=".6"/><path d="M11.2 15.4h1.6L12 16.3z"/>',
+  person: '<circle cx="12" cy="8" r="3.5"/><path d="M5 20c0-3.9 3.1-7 7-7s7 3.1 7 7"/>',
+  bottle: '<rect x="7" y="8" width="10" height="13" rx="2"/><path d="M9 8V5h6v3M10 14h4"/>',
+  camera: '<path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/>'
+};
+
+/* ---------- 药品计算 ---------- */
+function liveBatches(m) {
+  return (m.batches || []).filter(b => b.qty > 0)
+    .sort((a, b) => a.exp.localeCompare(b.exp) || (a.opened ? 0 : 1) - (b.opened ? 0 : 1) || String(a.opened).localeCompare(String(b.opened)));
+}
+const totalQty = m => liveBatches(m).reduce((s, b) => s + b.qty, 0);
+const openedQty = m => liveBatches(m).filter(b => b.opened).reduce((s, b) => s + b.qty, 0);
+const nearestExp = m => { const b = liveBatches(m)[0]; return b ? b.exp : null; };
+function status(m) {
+  const e = nearestExp(m);
+  if (!e) return 'empty';
+  const d = daysUntil(e);
+  if (d < 0) return 'bad';
+  if (d <= (m.remindDays || 60)) return 'warn';
+  return 'ok';
+}
+const isAlert = m => ['warn', 'bad'].includes(status(m));
+function byExp(a, b) {
+  const ea = nearestExp(a), eb = nearestExp(b);
+  if (!ea && !eb) return a.name.localeCompare(b.name, 'zh');
+  if (!ea) return 1;
+  if (!eb) return -1;
+  return ea.localeCompare(eb) || a.name.localeCompare(b.name, 'zh');
+}
+function tidy(m) { m.batches = (m.batches || []).filter(b => b.qty > 0); }
+function addLog(m, type, exp, qty, date, note) {
+  m.log = m.log || [];
+  m.log.push({ type, exp, qty, date: date || todayStr(), note: note || '' });
+  if (m.log.length > 200) m.log = m.log.slice(-200);
+}
+
+/* ---------- 存储：本机 ---------- */
+const LocalStore = {
+  db: null,
+  async init() {
+    this.db = await new Promise((res, rej) => {
+      const r = indexedDB.open('yaoxiang', 1);
+      r.onupgradeneeded = () => r.result.createObjectStore('meds', { keyPath: 'id' });
+      r.onsuccess = () => res(r.result);
+      r.onerror = () => rej(r.error);
+    });
+    try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) { /* ignore */ }
+    const all = await this.tx('readonly', s => s.getAll());
+    (all || []).forEach(m => state.meds.set(m.id, m));
+    state.ready = true;
+    render();
+  },
+  tx(mode, fn) {
+    return new Promise((res, rej) => {
+      const t = this.db.transaction('meds', mode);
+      const req = fn(t.objectStore('meds'));
+      t.oncomplete = () => res(req && req.result);
+      t.onerror = () => rej(t.error);
+    });
+  },
+  put(m) { return this.tx('readwrite', s => s.put(m)); },
+  del(id) { return this.tx('readwrite', s => s.delete(id)); }
+};
+
+/* ---------- 存储：Firebase 云端 ---------- */
+function loadScript(src) {
+  return new Promise((res, rej) => {
+    const s = document.createElement('script');
+    s.src = src; s.onload = res; s.onerror = () => rej(new Error('无法加载 ' + src));
+    document.head.appendChild(s);
+  });
+}
+const CloudStore = {
+  auth: null, fs: null, uid: null, unsub: null,
+  async init() {
+    const base = `https://www.gstatic.com/firebasejs/${FB_VER}/`;
+    await loadScript(base + 'firebase-app-compat.js');
+    await loadScript(base + 'firebase-auth-compat.js');
+    await loadScript(base + 'firebase-firestore-compat.js');
+    firebase.initializeApp(FIREBASE_CONFIG);
+    this.auth = firebase.auth();
+    this.fs = firebase.firestore();
+    try { await this.fs.enablePersistence({ synchronizeTabs: true }); } catch (e) { /* 离线缓存不可用时照常运行 */ }
+    this.auth.onAuthStateChanged(user => {
+      if (this.unsub) { this.unsub(); this.unsub = null; }
+      state.meds.clear();
+      state.user = user;
+      this.uid = user ? user.uid : null;
+      if (!user) { state.ready = true; render(); return; }
+      state.ready = false;
+      render();
+      this.unsub = this.col().onSnapshot(snap => {
+        snap.docChanges().forEach(ch => {
+          if (ch.type === 'removed') state.meds.delete(ch.doc.id);
+          else state.meds.set(ch.doc.id, ch.doc.data());
+        });
+        state.ready = true;
+        render();
+      }, err => toast('同步出错：' + err.message));
+    });
+  },
+  col() { return this.fs.collection('users').doc(this.uid).collection('meds'); },
+  put(m) { return this.col().doc(m.id).set(clone(m)); },
+  del(id) { return this.col().doc(id).delete(); },
+  logout() { return this.auth.signOut(); }
+};
+
+function save(m) {
+  state.meds.set(m.id, m);
+  render();
+  Promise.resolve().then(() => store.put(m)).catch(e => toast('保存失败：' + e.message));
+}
+
+/* ---------- 弹层 ---------- */
+function showLayer(html) {
+  const wasOpen = $layer.classList.contains('open');
+  $layer.innerHTML = html;
+  $layer.classList.add('open');
+  document.body.style.overflow = 'hidden';
+  if (!wasOpen) {
+    $layer.classList.add('anim');
+    setTimeout(() => $layer.classList.remove('anim'), 300);
+  }
+}
+function closeLayer() {
+  $layer.classList.remove('open', 'anim');
+  $layer.innerHTML = '';
+  document.body.style.overflow = '';
+  sheet = null;
+}
+
+/* ---------- 通用片段 ---------- */
+const topbar = (left, title, right) =>
+  `<header class="top"><div>${left || ''}</div><h1 class="top-t">${title || ''}</h1><div class="top-r">${right || ''}</div></header>`;
+const backBtn = href => `<a class="icon-btn" href="${href}" aria-label="返回">${svg(P.back, 24)}</a>`;
+function photoHtml(m, cls) {
+  return m.photo
+    ? `<img class="${cls}" src="${esc(m.photo)}" alt="">`
+    : `<div class="${cls} ph">${svg(P.bottle, cls === 'thumb' ? 26 : 34, 1.6)}</div>`;
+}
+function tagsHtml(m, link) {
+  const t = m.tags || [];
+  if (!t.length) return '';
+  return `<div class="tags">${t.map(x => link
+    ? `<a class="tag" href="#/box/${m.box}/tag/${encodeURIComponent(x)}">#${esc(x)}</a>`
+    : `<span class="tag">#${esc(x)}</span>`).join('')}</div>`;
+}
+function daysHtml(m) {
+  const e = nearestExp(m);
+  if (!e) return `<div class="days st-empty"><span>已用完</span></div>`;
+  const d = daysUntil(e);
+  if (d < 0) return `<div class="days st-bad"><span>过期</span><b class="num">${-d}</b><span>天</span></div>`;
+  return `<div class="days st-${status(m)}"><b class="num">${d}</b><span>天</span></div>`;
+}
+const notFound = () => topbar(backBtn('#/'), '', '') + '<p class="empty">找不到这个页面</p>';
+
+/* ---------- 首页 ---------- */
+function viewHome() {
+  const meds = [...state.meds.values()];
+  const tiles = Object.entries(BOXES).map(([k, label]) => {
+    const ms = meds.filter(m => m.box === k);
+    const alert = ms.filter(isAlert).length;
+    const sub = ms.length ? `${ms.length} 种药品` : '还没有药品，点进去添加';
+    return `<a class="tile" href="#/box/${k}">
+      <div class="tile-ic">${svg(k === 'cat' ? P.cat : P.person, 30, 1.8)}</div>
+      <div class="tile-b"><span class="tile-t">${label}</span>
+        <span class="tile-s">${sub}${alert ? `<em class="chip warn">${alert} 种快过期</em>` : ''}</span></div>
+      ${svg(P.chev, 20)}</a>`;
+  }).join('');
+  const soon = meds.filter(m => nearestExp(m)).sort(byExp).slice(0, 5);
+  const soonHtml = soon.length ? `<h2 class="sec">最近到期</h2><div class="card">${soon.map(m => `
+    <a class="mini" href="#/med/${m.id}">
+      <div class="mini-b"><b>${esc(m.name)}</b><small>${BOXES[m.box]}，${dot(nearestExp(m))} 到期</small></div>
+      ${daysHtml(m)}</a>`).join('')}</div>` : '';
+  return topbar('', '', `<a class="icon-btn" href="#/settings" aria-label="设置">${svg(P.gear)}</a>`) +
+    `<main class="pad"><h1 class="big">家庭药箱</h1><p class="muted" style="margin:0">选择要查看的药箱</p>
+    <div class="tiles">${tiles}</div>${soonHtml}</main>`;
+}
+
+/* ---------- 药箱列表 ---------- */
+function medRow(m) {
+  const tot = totalQty(m), op = openedQty(m), e = nearestExp(m);
+  return `<a class="row${tot ? '' : ' dim'}" href="#/med/${m.id}">
+    ${photoHtml(m, 'thumb')}
+    <div class="row-b">
+      <div class="row-t"><b>${esc(m.name)}</b>${m.spec ? `<small>${esc(m.spec)}</small>` : ''}</div>
+      ${tagsHtml(m, false)}
+      <div class="row-s">共 ${tot} 件${op ? `，<span class="warn-t">${op} 件已开封</span>` : ''}</div>
+      <div class="row-s">${e ? dot(e) + ' 到期' : '已用完'}</div>
+    </div>
+    ${daysHtml(m)}</a>`;
+}
+function viewBox(box, kind, val) {
+  if (!BOXES[box]) return notFound();
+  const all = [...state.meds.values()].filter(m => m.box === box);
+  const cnt = {
+    all: all.length,
+    opened: all.filter(m => openedQty(m) > 0).length,
+    soon: all.filter(isAlert).length
+  };
+  let list = all, title = BOXES[box];
+  if (kind === 'tag') { list = all.filter(m => (m.tags || []).includes(val)); title = '#' + esc(val); }
+  else if (kind === 'f' && val === 'opened') list = all.filter(m => openedQty(m) > 0);
+  else if (kind === 'f' && val === 'soon') list = all.filter(isAlert);
+  const q = state.search.trim().toLowerCase();
+  if (q) list = list.filter(m => [m.name, m.spec, ...(m.tags || [])].join(' ').toLowerCase().includes(q));
+  list = list.slice().sort(byExp);
+
+  const base = '#/box/' + box;
+  const pill = (href, label, on) => `<a class="pill${on ? ' on' : ''}" href="${href}">${label}</a>`;
+  const pills = kind === 'tag'
+    ? `<a class="pill on" href="${base}" aria-label="清除分类筛选">#${esc(val)} ${svg(P.close, 14)}</a>`
+    : pill(base, `全部 ${cnt.all}`, !kind) +
+      pill(base + '/f/opened', `已开封 ${cnt.opened}`, val === 'opened') +
+      pill(base + '/f/soon', `快过期 ${cnt.soon}`, val === 'soon');
+  const search = state.searchOpen
+    ? `<div class="searchbar"><input id="q" type="search" placeholder="搜索名称、规格、分类" value="${esc(state.search)}" autocomplete="off"></div>` : '';
+  const rows = list.length ? list.map(medRow).join('')
+    : `<p class="empty">${all.length ? '没有符合的药品' : '还没有药品，点右下角 + 添加'}</p>`;
+  return topbar(
+    `<button class="icon-btn" data-act="drawer" data-box="${box}" aria-label="菜单">${svg(P.menu)}</button>`,
+    title,
+    `<button class="icon-btn" data-act="search" aria-label="搜索">${svg(P.search)}</button>`
+  ) + search + `<nav class="pills">${pills}</nav><main class="list">${rows}</main>
+    <a class="fab" href="#/add/${box}" aria-label="添加药品">${svg(P.plus, 28, 2.2)}</a>`;
+}
+function openDrawer(box) {
+  const all = [...state.meds.values()].filter(m => m.box === box);
+  const count = {};
+  all.forEach(m => (m.tags || []).forEach(t => { count[t] = (count[t] || 0) + 1; }));
+  const tags = Object.keys(count).sort((a, b) => a.localeCompare(b, 'zh'));
+  const base = '#/box/' + box;
+  showLayer(`<div class="scrim" data-act="close"></div>
+    <aside class="drawer" role="dialog" aria-label="菜单">
+      <h2>${BOXES[box]}</h2>
+      <a href="${base}">全部药品<span>${all.length}</span></a>
+      <a href="${base}/f/soon">快过期<span>${all.filter(isAlert).length}</span></a>
+      <a href="${base}/f/opened">已开封<span>${all.filter(m => openedQty(m) > 0).length}</span></a>
+      <h3>分类</h3>
+      ${tags.length ? tags.map(t => `<a href="${base}/tag/${encodeURIComponent(t)}">#${esc(t)}<span>${count[t]}</span></a>`).join('')
+        : '<p class="muted">添加药品时写上分类，就会出现在这里</p>'}
+      <hr>
+      <a href="#/">首页</a>
+      <a href="#/settings">设置</a>
+    </aside>`);
+}
+
+/* ---------- 药品详情 ---------- */
+function viewMed(id) {
+  const m = state.meds.get(id);
+  if (!m) return notFound();
+  const bs = liveBatches(m);
+  const e = nearestExp(m);
+  const d = e ? daysUntil(e) : null;
+  const distance = !e ? '<span class="muted">已用完</span>'
+    : d < 0 ? `<span class="st-bad">已过期 <b class="num">${-d}</b> 天</span>`
+    : `<span class="st-${status(m)}">距离过期 <b class="num">${d}</b> 天</span>`;
+
+  const remind = `<label class="line"><span>过期提醒</span>
+    <select data-change="remind" data-id="${m.id}">${REMIND_OPTIONS.map(n =>
+      `<option value="${n}"${n === m.remindDays ? ' selected' : ''}>过期前 ${n} 天</option>`).join('')}</select></label>`;
+
+  const seen = new Set();
+  const batches = bs.length ? bs.map(b => {
+    const bd = daysUntil(b.exp);
+    const cls = bd < 0 ? 'st-bad' : bd <= m.remindDays ? 'st-warn' : 'st-ok';
+    const rd = addDays(b.exp, -m.remindDays);
+    let cal = '';
+    if (!seen.has(b.exp)) {
+      seen.add(b.exp);
+      cal = daysUntil(rd) >= 0
+        ? `<button class="link-btn" data-act="cal" data-id="${m.id}" data-exp="${b.exp}">${svg(P.cal, 16, 1.8)}加日历提醒（${dot(rd)}）</button>`
+        : '';
+    }
+    return `<div class="batch">
+      <div class="batch-h"><b>${dot(b.exp)} 到期</b><span class="${cls}">${bd < 0 ? `已过期 ${-bd} 天` : `${bd} 天`}</span></div>
+      <div class="batch-m"><span>${b.qty} 件</span>${b.opened
+        ? `<span class="chip warn">${dot(b.opened)} 开封</span>` : '<span class="chip">未开封</span>'}</div>
+      ${cal}</div>`;
+  }).join('') : '<p class="empty" style="padding:24px 0">已经用完了，点「库存更新」可以入库</p>';
+
+  const logs = (m.log || []).slice().reverse().slice(0, 30);
+  const logHtml = logs.length ? `<h2 class="sec">记录</h2><div class="card">${logs.map(l => `
+    <div class="log"><span class="log-d">${dot(l.date)}</span>
+      <span>${LOG_TEXT[l.type] || l.type} ${l.qty} 件<small>（${dot(l.exp)} 到期）</small>${l.note ? `<br><small>${esc(l.note)}</small>` : ''}</span></div>`).join('')}</div>` : '';
+
+  const img = m.photo
+    ? `<button class="hero-btn" data-act="photo" aria-label="查看大图">${photoHtml(m, 'hero-img')}</button>`
+    : photoHtml(m, 'hero-img');
+
+  return topbar(backBtn('#/box/' + m.box), '药品详情',
+      `<a class="icon-btn" href="#/edit/${m.id}" aria-label="编辑">${svg(P.edit)}</a>`) +
+    `<section class="hero">${img}
+      <div class="hero-b"><h2>${esc(m.name)}</h2>${m.spec ? `<p>${esc(m.spec)}</p>` : ''}
+        ${tagsHtml(m, true)}<span class="chip ok">${BOXES[m.box]}</span></div></section>
+    <main class="pad detail">
+      <div class="sec-row"><h2 class="sec">期限</h2>${distance}</div>
+      <div class="card">${remind}</div>
+      <h2 class="sec">批次</h2>${batches}
+      ${logHtml}
+      <p class="foot">添加于 ${dot(m.createdAt)}</p>
+    </main>
+    <div class="bottombar">
+      <div class="remain">剩余 <b class="num">${totalQty(m)}</b> 件</div>
+      <button class="btn primary" data-act="stock" data-id="${m.id}">库存更新</button>
+    </div>`;
+}
+
+/* ---------- 库存更新 ---------- */
+function openStock(id) {
+  const m = state.meds.get(id);
+  if (!m) return;
+  const bs = liveBatches(m);
+  sheet = { id, mode: bs.length ? 'out' : 'in', batchId: bs.length ? bs[0].id : null, n: 1, date: todayStr(), note: '', exp: '' };
+  renderSheet();
+}
+function renderSheet() {
+  const m = state.meds.get(sheet.id);
+  if (!m) { closeLayer(); return; }
+  const s = sheet;
+  const bs = liveBatches(m);
+  const tot = totalQty(m);
+  if (s.mode === 'out' && !bs.length) s.mode = 'in';
+  if (s.mode === 'out' && !bs.some(b => b.id === s.batchId)) s.batchId = bs[0].id;
+  const sel = bs.find(b => b.id === s.batchId);
+  const max = s.mode === 'out' ? (sel ? sel.qty : 1) : 999;
+  s.n = Math.min(Math.max(1, s.n), max);
+  const after = s.mode === 'out' ? tot - s.n : tot + s.n;
+
+  const stepper = `<div class="line"><span>数量</span><div class="stepper">
+    <button data-act="n" data-v="-1" aria-label="减少"${s.n <= 1 ? ' disabled' : ''}>${svg(P.minus, 20, 2.2)}</button>
+    <b class="num">${s.n}</b>
+    <button data-act="n" data-v="1" aria-label="增加"${s.n >= max ? ' disabled' : ''}>${svg(P.plus, 20, 2.2)}</button></div></div>`;
+  const dateRow = `<label class="line"><span>日期</span><input type="date" data-in="date" value="${s.date}"></label>`;
+  const noteRow = `<label class="line"><span>备注</span><input type="text" data-in="note" placeholder="添加说明（可选）" value="${esc(s.note)}"></label>`;
+
+  let body;
+  if (s.mode === 'out') {
+    body = `<div class="field-l">选择批次</div><div class="opts">${bs.map(b => `
+      <button class="opt${b.id === s.batchId ? ' on' : ''}" data-act="pick-batch" data-v="${b.id}">
+        <span>${dot(b.exp)} 到期</span><span>${b.opened ? dot(b.opened) + ' 开封' : '未开封'}，${b.qty} 件</span></button>`).join('')}</div>
+      ${stepper}${dateRow}${noteRow}
+      <div class="actions2">
+        <button class="btn" data-act="do-use">用完</button>
+        <button class="btn primary" data-act="do-open"${sel && !sel.opened ? '' : ' disabled'}>开封</button>
+      </div>
+      <p class="hint">${sel && sel.opened ? '这一批已经开封了' : '开封只记录日期，不改变数量；用完会减少数量'}</p>`;
+  } else {
+    const exps = [...new Set(bs.map(b => b.exp))];
+    body = `<label class="line"><span>过期日期</span><input type="date" data-in="exp" value="${s.exp}"></label>
+      ${exps.length ? `<div class="quick">${exps.map(e => `<button class="pill${s.exp === e ? ' on' : ''}" data-act="pick-exp" data-v="${e}">${dot(e)}</button>`).join('')}</div>` : ''}
+      ${stepper}${dateRow}${noteRow}
+      <button class="btn primary wide" data-act="do-in">确认入库</button>`;
+  }
+  showLayer(`<div class="scrim" data-act="close"></div>
+    <div class="sheet" role="dialog" aria-label="库存更新">
+      <div class="sheet-h">
+        <div class="seg">
+          <button data-act="mode" data-v="out" class="${s.mode === 'out' ? 'on' : ''}"${bs.length ? '' : ' disabled'}>出库</button>
+          <button data-act="mode" data-v="in" class="${s.mode === 'in' ? 'on' : ''}">入库</button>
+        </div>
+        <div class="change num">${tot}${svg(P.arrow, 18)}<span class="${s.mode === 'out' ? 'st-bad' : 'st-ok'}">${after}</span></div>
+        <button class="icon-btn" data-act="close" aria-label="关闭">${svg(P.close)}</button>
+      </div>${body}</div>`);
+}
+function doUse() {
+  const s = sheet, m = clone(state.meds.get(s.id));
+  const b = m.batches.find(x => x.id === s.batchId);
+  if (!b) return;
+  const n = Math.min(s.n, b.qty);
+  b.qty -= n;
+  addLog(m, 'use', b.exp, n, s.date, s.note);
+  tidy(m);
+  save(m);
+  closeLayer();
+  toast(`已记为用完 ${n} 件`);
+}
+function doOpen() {
+  const s = sheet, m = clone(state.meds.get(s.id));
+  const b = m.batches.find(x => x.id === s.batchId);
+  if (!b || b.opened) return;
+  const n = Math.min(s.n, b.qty);
+  const date = s.date || todayStr();
+  b.qty -= n;
+  const t = m.batches.find(x => x.exp === b.exp && x.opened === date);
+  if (t) t.qty += n;
+  else m.batches.push({ id: uid(), exp: b.exp, qty: n, opened: date });
+  addLog(m, 'open', b.exp, n, date, s.note);
+  tidy(m);
+  save(m);
+  closeLayer();
+  toast(`已开封 ${n} 件`);
+}
+function doIn() {
+  const s = sheet;
+  if (!s.exp) { toast('请选择过期日期'); return; }
+  const m = clone(state.meds.get(s.id));
+  const isNew = !m.batches.some(x => x.exp === s.exp);
+  const t = m.batches.find(x => x.exp === s.exp && !x.opened);
+  if (t) t.qty += s.n;
+  else m.batches.push({ id: uid(), exp: s.exp, qty: s.n, opened: null });
+  addLog(m, 'in', s.exp, s.n, s.date, s.note);
+  save(m);
+  toast(`已入库 ${s.n} 件`);
+  if (isNew && daysUntil(addDays(s.exp, -m.remindDays)) >= 0) askCalendar(m, s.exp);
+  else closeLayer();
+}
+
+/* ---------- 日历提醒 ---------- */
+function icsFor(m, exp) {
+  const rd = addDays(exp, -m.remindDays);
+  const d1 = rd.replace(/-/g, '');
+  const d2 = addDays(rd, 1).replace(/-/g, '');
+  const now = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+  const e = s => String(s).replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\n/g, '\\n');
+  const title = `药品快过期：${m.name}`;
+  const desc = `${BOXES[m.box]}「${m.name}」将于 ${dot(exp)} 过期。`;
+  return [
+    'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//yaoxiang//CN', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH',
+    'BEGIN:VEVENT',
+    `UID:${m.id}-${exp}-${m.remindDays}@yaoxiang`,
+    `DTSTAMP:${now}`,
+    `DTSTART;VALUE=DATE:${d1}`,
+    `DTEND;VALUE=DATE:${d2}`,
+    `SUMMARY:${e(title)}`,
+    `DESCRIPTION:${e(desc)}`,
+    'BEGIN:VALARM', 'ACTION:DISPLAY', `DESCRIPTION:${e(title)}`, 'TRIGGER:PT9H', 'END:VALARM',
+    'END:VEVENT', 'END:VCALENDAR', ''
+  ].join('\r\n');
+}
+function addToCalendar(m, exp) {
+  const rd = addDays(exp, -m.remindDays);
+  if (daysUntil(rd) < 0) { toast('已经在提醒期内，不用再加提醒'); return; }
+  const name = `${m.name}-${exp}.ics`.replace(/[\\/:*?"<>|]/g, '_');
+  const blob = new Blob([icsFor(m, exp)], { type: 'text/calendar' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+}
+function askCalendar(m, exp) {
+  const rd = addDays(exp, -m.remindDays);
+  showLayer(`<div class="scrim" data-act="close"></div>
+    <div class="sheet" role="dialog" aria-label="日历提醒">
+      <h2 class="sheet-t">加到日历提醒？</h2>
+      <p>会在 ${dot(rd)} 上午 9 点提醒：${esc(m.name)} 将于 ${dot(exp)} 过期。</p>
+      <div class="actions2">
+        <button class="btn" data-act="close">以后再说</button>
+        <button class="btn primary" data-act="cal" data-id="${m.id}" data-exp="${exp}">加到日历</button>
+      </div></div>`);
+}
+
+/* ---------- 添加 / 编辑 ---------- */
+function viewForm(mode, arg) {
+  const key = mode + ':' + arg;
+  if (!form || form.key !== key) {
+    if (mode === 'add') {
+      form = { key, box: BOXES[arg] ? arg : 'cat', name: '', spec: '', tags: [], photo: '', exp: '', qty: 1, remindDays: 60, tagDraft: '' };
+    } else {
+      const m = state.meds.get(arg);
+      if (!m) return notFound();
+      form = { key, id: m.id, box: m.box, name: m.name, spec: m.spec || '', tags: (m.tags || []).slice(), photo: m.photo || '', remindDays: m.remindDays || 60, tagDraft: '' };
+    }
+  }
+  const f = form;
+  const suggest = [...new Set([...state.meds.values()].filter(m => m.box === f.box).flatMap(m => m.tags || []))]
+    .filter(t => !f.tags.includes(t)).sort((a, b) => a.localeCompare(b, 'zh'));
+  const cancel = mode === 'add' ? '#/box/' + f.box : '#/med/' + f.id;
+
+  return topbar(`<a class="text-btn" href="${cancel}">取消</a>`, mode === 'add' ? '添加药品' : '编辑药品', '') +
+    `<main class="pad form">
+      <input type="file" id="photo-in" accept="image/*" hidden>
+      <button class="photo-pick" data-act="pick-photo" aria-label="选择照片">${f.photo
+        ? `<img src="${esc(f.photo)}" alt="">`
+        : `${svg(P.camera, 30, 1.8)}<span>拍照或从相册选择</span>`}</button>
+
+      <div class="card">
+        <label class="line"><span>名称</span><input id="f-name" data-f="name" type="text" placeholder="例如：甲硝唑" value="${esc(f.name)}"></label>
+        <label class="line"><span>规格</span><input id="f-spec" data-f="spec" type="text" placeholder="例如：200mg，100 片" value="${esc(f.spec)}"></label>
+      </div>
+
+      <div class="field-l">分类</div>
+      <div class="tagbox">${f.tags.map(t =>
+        `<button class="tag" data-act="rm-tag" data-v="${esc(t)}" aria-label="删除分类 ${esc(t)}">#${esc(t)} ${svg(P.close, 12)}</button>`).join('')}
+        <input id="tag-in" type="text" placeholder="${f.tags.length ? '继续添加' : '输入分类，按空格或回车'}" value="${esc(f.tagDraft)}" enterkeyhint="done" autocomplete="off">
+      </div>
+      ${suggest.length ? `<div class="quick">${suggest.map(t => `<button class="tag" data-act="add-tag" data-v="${esc(t)}">+ #${esc(t)}</button>`).join('')}</div>` : ''}
+
+      <div class="field-l">放进哪个药箱</div>
+      <div class="seg2">${Object.entries(BOXES).map(([k, l]) =>
+        `<button data-act="f-box" data-v="${k}" class="${f.box === k ? 'on' : ''}">${l}</button>`).join('')}</div>
+
+      ${mode === 'add' ? `<div class="card">
+        <label class="line"><span>过期日期</span><input id="f-exp" data-f="exp" type="date" value="${f.exp}"></label>
+        <div class="line"><span>数量</span><div class="stepper">
+          <button data-act="f-qty" data-v="-1" aria-label="减少"${f.qty <= 1 ? ' disabled' : ''}>${svg(P.minus, 20, 2.2)}</button>
+          <b class="num">${f.qty}</b>
+          <button data-act="f-qty" data-v="1" aria-label="增加">${svg(P.plus, 20, 2.2)}</button></div></div>
+      </div>` : ''}
+
+      <div class="field-l">过期提醒</div>
+      <div class="seg3">${REMIND_OPTIONS.map(n =>
+        `<button data-act="f-remind" data-v="${n}" class="${f.remindDays === n ? 'on' : ''}">过期前 ${n} 天</button>`).join('')}</div>
+      ${mode === 'add' ? `<p class="hint" id="remind-hint">${remindHint()}</p>` : '<p class="hint">改了提醒天数后，到详情页重新加一次日历提醒</p>'}
+
+      <button class="btn primary wide" data-act="save-form">${mode === 'add' ? '保存，并添加日历提醒' : '保存'}</button>
+      ${mode === 'edit' ? '<button class="btn danger wide" data-act="del-med">删除这个药品</button>' : ''}
+    </main>`;
+}
+function remindHint() {
+  if (!form.exp) return '选好过期日期后，会在过期前提醒你';
+  const rd = addDays(form.exp, -form.remindDays);
+  return daysUntil(rd) < 0 ? '已经在提醒期内了，不会再加日历提醒' : `将在 ${dot(rd)} 上午 9 点通过日历提醒你`;
+}
+function commitTag() {
+  const t = form.tagDraft.replace(/[#＃,，\s]/g, '');
+  form.tagDraft = '';
+  if (t && !form.tags.includes(t)) form.tags.push(t);
+}
+function saveForm() {
+  const f = form;
+  commitTag();
+  const name = f.name.trim();
+  if (!name) { toast('请填写名称'); return; }
+  if (f.id) {
+    const m = clone(state.meds.get(f.id));
+    Object.assign(m, { name, spec: f.spec.trim(), tags: f.tags, photo: f.photo, box: f.box, remindDays: f.remindDays });
+    form = null;
+    save(m);
+    location.hash = '#/med/' + m.id;
+    toast('已保存');
+    return;
+  }
+  if (!f.exp) { toast('请选择过期日期'); return; }
+  const today = todayStr();
+  const m = {
+    id: uid(), box: f.box, name, spec: f.spec.trim(), tags: f.tags, photo: f.photo,
+    remindDays: f.remindDays, createdAt: today,
+    batches: [{ id: uid(), exp: f.exp, qty: f.qty, opened: null }], log: []
+  };
+  addLog(m, 'add', f.exp, f.qty, today, '');
+  form = null;
+  save(m);
+  location.hash = '#/med/' + m.id;
+  addToCalendar(m, f.exp);
+}
+function delMed() {
+  const m = state.meds.get(form.id);
+  if (!m || !confirm(`删除「${m.name}」？删除后不能恢复。`)) return;
+  state.meds.delete(m.id);
+  form = null;
+  location.hash = '#/box/' + m.box;
+  Promise.resolve().then(() => store.del(m.id)).catch(e => toast('删除失败：' + e.message));
+}
+async function compressImage(file, max, q) {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = url; });
+    const k = Math.min(1, (max || 720) / Math.max(img.naturalWidth, img.naturalHeight));
+    const c = document.createElement('canvas');
+    c.width = Math.round(img.naturalWidth * k);
+    c.height = Math.round(img.naturalHeight * k);
+    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+    return c.toDataURL('image/jpeg', q || 0.72);
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+/* ---------- 设置 / 登录 ---------- */
+function viewSettings() {
+  const cloud = !!FIREBASE_CONFIG;
+  return topbar(backBtn('#/'), '设置', '') + `<main class="pad">
+    <h2 class="sec">数据保存在</h2>
+    <div class="card">
+      <div class="line"><span>${cloud ? '云端' : '这台手机'}</span><span class="muted">${cloud && state.user ? esc(state.user.email) : ''}</span></div>
+      ${cloud ? '<button class="line btn-line" data-act="logout">退出登录</button>' : ''}
+    </div>
+    ${cloud ? '' : '<p class="hint">现在数据只在这台手机上。设置好云同步后，换手机登录就能看到。</p>'}
+    <h2 class="sec">备份</h2>
+    <div class="card">
+      <button class="line btn-line" data-act="export">导出备份</button>
+      <button class="line btn-line" data-act="import">导入备份</button>
+    </div>
+    <input type="file" id="import-in" accept="application/json,.json" hidden>
+    <p class="foot">共 ${state.meds.size} 种药品</p>
+  </main>`;
+}
+function viewLogin() {
+  return `<main class="pad login">
+    <h1 class="big">家庭药箱</h1>
+    <p class="muted" style="margin:0">登录后数据会同步到云端，换手机也不会丢</p>
+    <div class="card">
+      <label class="line"><span>邮箱</span><input id="email" type="email" autocomplete="username" placeholder="you@example.com"></label>
+      <label class="line"><span>密码</span><input id="pw" type="password" autocomplete="current-password" placeholder="至少 6 位"></label>
+    </div>
+    <button class="btn primary wide" data-act="login">登录</button>
+    <button class="btn wide" data-act="signup">第一次用，注册</button>
+    <button class="text-btn" data-act="reset">忘记密码</button>
+  </main>`;
+}
+function authMsg(e) {
+  const map = {
+    'auth/invalid-email': '邮箱格式不对',
+    'auth/missing-password': '请填写密码',
+    'auth/weak-password': '密码至少 6 位',
+    'auth/email-already-in-use': '这个邮箱已经注册过，直接登录',
+    'auth/invalid-credential': '邮箱或密码不对',
+    'auth/wrong-password': '邮箱或密码不对',
+    'auth/user-not-found': '这个邮箱还没注册',
+    'auth/too-many-requests': '尝试太多次，稍后再试',
+    'auth/network-request-failed': '网络连接失败'
+  };
+  return map[e.code] || e.message;
+}
+async function doAuth(kind) {
+  const email = document.getElementById('email').value.trim();
+  const pw = document.getElementById('pw').value;
+  try {
+    if (kind === 'login') await store.auth.signInWithEmailAndPassword(email, pw);
+    else if (kind === 'signup') await store.auth.createUserWithEmailAndPassword(email, pw);
+    else {
+      if (!email) { toast('先填写邮箱'); return; }
+      await store.auth.sendPasswordResetEmail(email);
+      toast('重置密码的邮件已发送');
+    }
+  } catch (e) { toast(authMsg(e)); }
+}
+async function exportData() {
+  const data = { app: 'yaoxiang', v: 1, exportedAt: new Date().toISOString(), meds: [...state.meds.values()] };
+  const name = `药箱备份-${todayStr()}.json`;
+  const file = new File([JSON.stringify(data)], name, { type: 'application/json' });
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    try { await navigator.share({ files: [file] }); return; }
+    catch (e) { if (e.name === 'AbortError') return; }
+  }
+  const url = URL.createObjectURL(file);
+  const a = document.createElement('a');
+  a.href = url; a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+}
+async function importData(file) {
+  let meds;
+  try { meds = (JSON.parse(await file.text()) || {}).meds || []; }
+  catch (e) { toast('这个文件不是药箱备份'); return; }
+  meds = meds.filter(m => m && m.id && m.name && m.box);
+  if (!meds.length) { toast('备份里没有药品'); return; }
+  if (!confirm(`导入 ${meds.length} 种药品？已有的相同记录会被覆盖。`)) return;
+  meds.forEach(m => {
+    state.meds.set(m.id, m);
+    Promise.resolve().then(() => store.put(m)).catch(e => toast('导入失败：' + e.message));
+  });
+  render();
+  toast(`已导入 ${meds.length} 种药品`);
+}
+
+/* ---------- 路由与渲染 ---------- */
+function route() {
+  return location.hash.replace(/^#\/?/, '').split('/').filter(Boolean).map(s => {
+    try { return decodeURIComponent(s); } catch (e) { return s; }
+  });
+}
+function renderView() {
+  let html;
+  if (FIREBASE_CONFIG && state.ready && !state.user) html = viewLogin();
+  else if (!state.ready) html = '<main class="pad"><p class="empty">加载中…</p></main>';
+  else {
+    const [a, b, c, d] = route();
+    if (!a) html = viewHome();
+    else if (a === 'box') html = viewBox(b, c, d);
+    else if (a === 'med') html = viewMed(b);
+    else if (a === 'add') html = viewForm('add', b);
+    else if (a === 'edit') html = viewForm('edit', b);
+    else if (a === 'settings') html = viewSettings();
+    else html = notFound();
+  }
+  $app.innerHTML = html;
+}
+function render() {
+  const ae = document.activeElement;
+  const fid = ae && ae.id && $app.contains(ae) ? ae.id : null;
+  const y = window.scrollY;
+  renderView();
+  window.scrollTo(0, y);
+  if (fid) {
+    const el = document.getElementById(fid);
+    if (el) {
+      el.focus({ preventScroll: true });
+      try { el.setSelectionRange(el.value.length, el.value.length); } catch (e) { /* date 等输入框不支持 */ }
+    }
+  }
+}
+
+const actions = {
+  close: () => closeLayer(),
+  drawer: el => openDrawer(el.dataset.box),
+  search: () => {
+    state.searchOpen = !state.searchOpen;
+    if (!state.searchOpen) state.search = '';
+    render();
+    const q = document.getElementById('q');
+    if (q) q.focus();
+  },
+  photo: () => {
+    const img = document.querySelector('.hero-img');
+    if (img) showLayer(`<div class="scrim"></div><button class="viewer" data-act="close" aria-label="关闭大图"><img src="${esc(img.getAttribute('src'))}" alt=""></button>`);
+  },
+  stock: el => openStock(el.dataset.id),
+  mode: el => { sheet.mode = el.dataset.v; sheet.n = 1; renderSheet(); },
+  'pick-batch': el => { sheet.batchId = el.dataset.v; sheet.n = 1; renderSheet(); },
+  'pick-exp': el => { sheet.exp = el.dataset.v; renderSheet(); },
+  n: el => { sheet.n += Number(el.dataset.v); renderSheet(); },
+  'do-use': doUse,
+  'do-open': doOpen,
+  'do-in': doIn,
+  cal: el => {
+    const m = state.meds.get(el.dataset.id);
+    if (m) addToCalendar(m, el.dataset.exp);
+    if (el.closest('.sheet')) closeLayer();
+  },
+  'pick-photo': () => document.getElementById('photo-in').click(),
+  'rm-tag': el => { form.tags = form.tags.filter(t => t !== el.dataset.v); render(); },
+  'add-tag': el => { if (!form.tags.includes(el.dataset.v)) form.tags.push(el.dataset.v); render(); },
+  'f-box': el => { form.box = el.dataset.v; render(); },
+  'f-remind': el => { form.remindDays = Number(el.dataset.v); render(); },
+  'f-qty': el => { form.qty = Math.max(1, form.qty + Number(el.dataset.v)); render(); },
+  'save-form': saveForm,
+  'del-med': delMed,
+  login: () => doAuth('login'),
+  signup: () => doAuth('signup'),
+  reset: () => doAuth('reset'),
+  logout: () => { if (confirm('退出登录？')) store.logout(); },
+  export: exportData,
+  import: () => document.getElementById('import-in').click()
+};
+
+document.addEventListener('click', e => {
+  const el = e.target.closest('[data-act]');
+  if (!el || el.disabled) return;
+  const fn = actions[el.dataset.act];
+  if (fn) { e.preventDefault(); fn(el, e); }
+});
+document.addEventListener('input', e => {
+  const t = e.target;
+  if (t.id === 'q') { state.search = t.value; render(); return; }
+  if (t.dataset.in && sheet) { sheet[t.dataset.in] = t.value; return; }
+  if (t.dataset.f && form) {
+    form[t.dataset.f] = t.value;
+    if (t.dataset.f === 'exp') { const h = document.getElementById('remind-hint'); if (h) h.textContent = remindHint(); }
+    return;
+  }
+  if (t.id === 'tag-in' && form) {
+    form.tagDraft = t.value;
+    if (!e.isComposing && /[\s,，#＃]$/.test(t.value)) { commitTag(); render(); }
+  }
+});
+document.addEventListener('keydown', e => {
+  if (e.target.id === 'tag-in' && e.key === 'Enter' && !e.isComposing) {
+    e.preventDefault();
+    if (form) { commitTag(); render(); }
+  }
+  if (e.key === 'Escape' && $layer.classList.contains('open')) closeLayer();
+});
+document.addEventListener('change', async e => {
+  const t = e.target;
+  if (t.id === 'photo-in' && t.files && t.files[0]) {
+    try { form.photo = await compressImage(t.files[0]); render(); }
+    catch (err) { toast('照片读取失败，换一张试试'); }
+    t.value = '';
+  } else if (t.id === 'import-in' && t.files && t.files[0]) {
+    await importData(t.files[0]);
+    t.value = '';
+  } else if (t.dataset.change === 'remind') {
+    const m = clone(state.meds.get(t.dataset.id));
+    m.remindDays = Number(t.value);
+    save(m);
+    toast(`已改为过期前 ${m.remindDays} 天，记得重新加日历提醒`);
+  }
+});
+window.addEventListener('hashchange', () => {
+  const r = route();
+  if (r[0] !== 'add' && r[0] !== 'edit') form = null;
+  state.search = '';
+  state.searchOpen = false;
+  closeLayer();
+  renderView();
+  window.scrollTo(0, 0);
+});
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && state.ready && !form) render();
+});
+
+async function init() {
+  renderView();
+  try {
+    store = FIREBASE_CONFIG ? CloudStore : LocalStore;
+    await store.init();
+  } catch (e) {
+    $app.innerHTML = `<main class="pad"><p class="empty">启动失败：${esc(e.message)}</p></main>`;
+  }
+  if ('serviceWorker' in navigator && location.protocol === 'https:') {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  }
+}
+init();
+</script>
+</body>
+</html>
