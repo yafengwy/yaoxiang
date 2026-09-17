@@ -330,7 +330,7 @@ const BOXES = { cat: '猫用药', human: '人用药' };
 const REMIND_OPTIONS = [30, 60, 120];
 const LOG_TEXT = { add: '添加', in: '入库', use: '用完', open: '开封' };
 const FB_VER = '10.12.2';
-const APP_VER = '2026.09.17-26';
+const APP_VER = '2026.09.17-27';
 const MAX_PHOTOS = 6;
 const PHOTO_PX = 640;
 const PHOTO_Q = 0.62;
@@ -1375,10 +1375,27 @@ function delListItem(name, item) {
   l.items = l.items.filter(x => x !== item);
   saveDoc('lists', l);
 }
+function secOptions(sec) {
+  return Array.isArray(sec.options) ? sec.options.slice() : listItems(sec.name);
+}
+function editSection(symId, secId, fn) {
+  const sym = clone(symOf(symId));
+  const sec = (sym.sections || []).find(x => x.id === secId);
+  if (!sec) return;
+  if (!Array.isArray(sec.options)) sec.options = listItems(sec.name);
+  fn(sec);
+  saveDoc('symptoms', sym);
+}
+function addOption(symId, secId, v) {
+  editSection(symId, secId, sec => { if (!sec.options.includes(v)) sec.options.push(v); });
+}
+function delOption(symId, secId, v) {
+  editSection(symId, secId, sec => { sec.options = sec.options.filter(x => x !== v); });
+}
 function newSymptom(name) {
   const s = {
     id: uid(), name, color: SYM_COLORS[state.symptoms.size % SYM_COLORS.length],
-    sections: [{ id: uid(), name: '用药', type: 'multi' }]
+    sections: [{ id: uid(), name: '用药', type: 'multi', options: [] }]
   };
   saveDoc('symptoms', s);
   return s;
@@ -1700,7 +1717,7 @@ function sectionsHtml(sym, values) {
     const v = tplMode ? null : values[sec.id];
     let body = '';
     if (sec.type === 'multi' || sec.type === 'single') {
-      let opts = listItems(sec.name);
+      let opts = secOptions(sec);
       const cur = tplMode ? [] : (sec.type === 'multi' ? (Array.isArray(v) ? v : []) : (v ? [v] : []));
       opts = [...new Set([...opts, ...cur])];
       body = `<div class="quick">
@@ -1883,7 +1900,7 @@ function manageSection(secId) {
   const sec = (sym.sections || []).find(x => x.id === secId);
   if (!sec) return;
   const chips = (sec.type === 'multi' || sec.type === 'single');
-  const opts = chips ? listItems(sec.name) : [];
+  const opts = chips ? secOptions(sec) : [];
   const fromBox = chips ? medNames().filter(n => !opts.includes(n)) : [];
   showLayer(`<div class="scrim" data-act="close"></div>
     <div class="sheet menu-sheet" role="dialog" aria-label="管理板块">
@@ -1900,7 +1917,7 @@ function manageSection(secId) {
 function sectionAdd(name, type) {
   const sym = clone(symOf(activeSymId()));
   sym.sections = sym.sections || [];
-  sym.sections.push({ id: uid(), name, type });
+  sym.sections.push({ id: uid(), name, type, options: [] });
   saveDoc('symptoms', sym);
   closeLayer();
 }
@@ -2047,10 +2064,8 @@ const actions = {
   'mf-field-add': () => askText('加一栏叫什么', '比如 医院、疫苗', label => { mform.fields.push({ label, value: '' }); render(); }),
   'mf-field-del': el => { mform.fields.splice(Number(el.dataset.i), 1); render(); },
   'opt-from-box': el => {
-    const sym = symOf(activeSymId());
-    const sec = (sym.sections || []).find(x => x.id === el.dataset.sec);
-    addListItem(sec.name, el.dataset.v);
-    manageSection(sec.id);
+    addOption(activeSymId(), el.dataset.sec, el.dataset.v);
+    manageSection(el.dataset.sec);
   },
   'save-member': saveMember,
   'del-member': delMember,
@@ -2140,8 +2155,9 @@ const actions = {
     const sym = symOf(activeSymId());
     const sec = (sym.sections || []).find(x => x.id === secId);
     if (el.closest('.menu-sheet')) closeLayer();
+    const symId = activeSymId();
     askText('加一项：' + sec.name, '写上名字', v => {
-      addListItem(sec.name, v);
+      addOption(symId, secId, v);
       if (!lf) { render(); return; }
       if (sec.type === 'multi') {
         const cur = Array.isArray(lf.values[sec.id]) ? lf.values[sec.id].slice() : [];
@@ -2151,10 +2167,8 @@ const actions = {
     });
   },
   'opt-del': el => {
-    const sym = symOf(activeSymId());
-    const sec = (sym.sections || []).find(x => x.id === el.dataset.sec);
-    delListItem(sec.name, el.dataset.v);
-    manageSection(sec.id);
+    delOption(activeSymId(), el.dataset.sec, el.dataset.v);
+    manageSection(el.dataset.sec);
   },
   'sec-n': el => {
     const id = el.dataset.sec;
