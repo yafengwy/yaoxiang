@@ -88,6 +88,7 @@ button:disabled{opacity:.4;cursor:default}
 .searchbar input{width:100%;height:44px;border:0;border-radius:22px;background:var(--card);padding:0 16px;font-size:16px}
 .pills{display:flex;gap:8px;padding:4px 20px 8px;overflow-x:auto;scrollbar-width:none}
 .pills::-webkit-scrollbar{display:none}
+.pill svg{margin-left:2px;opacity:.6}
 .pill{flex-shrink:0;height:36px;padding:0 14px;border-radius:999px;border:1px solid var(--line);background:var(--card);color:var(--ink);font-size:14px;display:inline-flex;align-items:center;gap:4px}
 .pill.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
 
@@ -272,6 +273,10 @@ button.tag{height:34px;padding:0 12px;font-size:14px;border-radius:10px;display:
 .logs{display:flex;flex-direction:column;gap:10px}
 .log-row{display:flex;gap:12px;align-items:flex-start;background:var(--card);border-radius:18px;padding:14px 16px;color:var(--ink)}
 .log-row .dot{width:8px;height:8px;border-radius:4px;margin-top:7px;flex-shrink:0}
+.kicon{display:inline-flex;align-items:center;justify-content:center;flex-shrink:0}
+.log-row .kicon{margin-top:2px}
+.cal-cell .dots .kicon{height:13px}
+.pill .kicon{margin-right:5px}
 .log-b{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
 .log-b b{font-size:16px}
 .log-th{width:52px;height:52px;border-radius:12px;object-fit:cover;flex-shrink:0}
@@ -330,7 +335,7 @@ const BOXES = { cat: '猫用药', human: '人用药' };
 const REMIND_OPTIONS = [30, 60, 120];
 const LOG_TEXT = { add: '添加', in: '入库', use: '用完', open: '开封' };
 const FB_VER = '10.12.2';
-const APP_VER = '2026.09.17-27';
+const APP_VER = '2026.09.17-30';
 const MAX_PHOTOS = 6;
 const PHOTO_PX = 640;
 const PHOTO_Q = 0.62;
@@ -343,7 +348,7 @@ const COLS = ['meds', 'members', 'symptoms', 'logs', 'lists'];
 const state = {
   meds: new Map(), members: new Map(), symptoms: new Map(), logs: new Map(), lists: new Map(),
   ready: false, user: null, search: '', searchOpen: false, expiredOpen: false,
-  cal: '', calDay: '', calView: 'month', symFilter: ''
+  cal: '', calDay: '', calView: 'month', symFilter: '', sortAsc: true, range: { kind: 'year' }
 };
 let store = null;
 let sheet = null;
@@ -387,7 +392,11 @@ const P = {
   person: '<circle cx="12" cy="8" r="3.5"/><path d="M5 20c0-3.9 3.1-7 7-7s7 3.1 7 7"/>',
   bottle: '<rect x="7" y="8" width="10" height="13" rx="2"/><path d="M9 8V5h6v3M10 14h4"/>',
   camera: '<path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/>',
-  check: '<path d="M5 12l5 5 9-10"/>'
+  check: '<path d="M5 12l5 5 9-10"/>',
+  down: '<path d="M6 9l6 6 6-6"/>',
+  vaccine: '<path d="M18 2l4 4"/><path d="M15.5 4.5l4 4"/><path d="M13 7l4 4-8 8H5v-4z"/><path d="M11 9l2 2"/>',
+  visit: '<path d="M4 21V9.5L12 4l8 5.5V21z"/><path d="M12 11v6M9 14h6"/>',
+  up: '<path d="M6 15l6-6 6 6"/>'
 };
 
 /* ---------- 药品计算 ---------- */
@@ -591,7 +600,7 @@ function viewHome() {
     `<main class="pad">
       <h1 class="big">家庭药箱</h1>
       <div class="tiles">${tiles}</div>
-      <h1 class="big" style="margin-top:34px">生病记录</h1>
+      <h1 class="big" style="margin-top:34px">健康簿</h1>
       <div class="tiles">${healthTiles}</div>
     </main>`;
 }
@@ -891,6 +900,17 @@ function addToCalendar(m, exp) {
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 60000);
 }
+function afterNav(fn) {
+  let done = false;
+  const run = () => {
+    if (done) return;
+    done = true;
+    window.removeEventListener('hashchange', run);
+    setTimeout(fn, 0);
+  };
+  window.addEventListener('hashchange', run);
+  setTimeout(run, 400);
+}
 function goReplace(hash) {
   location.replace(location.pathname + location.search + hash);
 }
@@ -1068,7 +1088,7 @@ function saveForm() {
   const due = exps.filter(e => daysUntil(addDays(e, -m.remindDays)) >= 0);
   if (due.length === 1) addToCalendar(m, due[0]);
   goReplace('#/med/' + m.id);
-  if (due.length > 1) setTimeout(() => askCalendarList(m, due), 0);
+  if (due.length > 1) afterNav(() => askCalendarList(m, due));
 }
 function delMed() {
   const m = state.meds.get(form.id);
@@ -1316,6 +1336,12 @@ async function importData(file) {
 const KINDS = { cat: '猫', human: '人' };
 const SYM_COLORS = ['#E0761A', '#8B5CF6', '#2F8FD6', '#4CAF3F', '#EC4899', '#12B5A5', '#D92D20'];
 const SEC_TYPES = { multi: '多选', single: '单选', number: '数字', text: '文字' };
+const LOG_KINDS = { symptom: '症状', visit: '就诊', vaccine: '疫苗' };
+const VAC_COLOR = '#2F8FD6';
+const VISIT_COLOR = '#B3261E';
+const VAC_LIST = '疫苗';
+const PLACE_LIST = '就诊地点';
+const kindOf = l => l.kind || 'symptom';
 const WEEK = ['日', '一', '二', '三', '四', '五', '六'];
 
 let mform = null;
@@ -1400,6 +1426,19 @@ function newSymptom(name) {
   saveDoc('symptoms', s);
   return s;
 }
+function rangeBounds() {
+  const r = state.range || { kind: 'year' };
+  const t = todayStr();
+  const y = t.slice(0, 4), m = t.slice(0, 7);
+  if (r.kind === 'all') return { from: '0000-01-01', to: '9999-12-31', label: '全部' };
+  if (r.kind === 'month') {
+    const end = new Date(Number(y), Number(t.slice(5, 7)), 0);
+    return { from: m + '-01', to: ymd(end), label: `${Number(t.slice(5, 7))} 月` };
+  }
+  if (r.kind === 'half') return { from: addDays(t, -182), to: t, label: '近半年' };
+  if (r.kind === 'custom') return { from: r.from, to: r.to, label: `${dot(r.from)} – ${dot(r.to)}` };
+  return { from: y + '-01-01', to: y + '-12-31', label: `${y} 年` };
+}
 function logsFor(memberId, symptomId) {
   return [...state.logs.values()]
     .filter(l => l.memberId === memberId && l.symptomId === symptomId)
@@ -1415,8 +1454,9 @@ function episodeOf(memberId, symptomId, date) {
   const day = Math.round((parseYmd(date) - parseYmd(from)) / 86400000) + 1;
   return { day, from };
 }
-function episodeCount(memberId, symptomId) {
-  const arr = logsFor(memberId, symptomId);
+function episodeCount(memberId, symptomId, from, to) {
+  let arr = logsFor(memberId, symptomId);
+  if (from) arr = arr.filter(l => l.date >= from && l.date <= to);
   if (!arr.length) return 0;
   const sy = symOf(symptomId);
   if (sy && sy.healTrack === false) return arr.length;
@@ -1427,7 +1467,28 @@ function episodeCount(memberId, symptomId) {
   });
   return n;
 }
+function vacDue(l) {
+  if (!l.date || !l.years) return '';
+  const d = parseYmd(l.date);
+  d.setFullYear(d.getFullYear() + Number(l.years));
+  return ymd(d);
+}
+function logTitle(l) {
+  const k = kindOf(l);
+  if (k === 'vaccine') return `疫苗${l.vacName ? '：' + esc(l.vacName) : ''}`;
+  if (k === 'visit') return `就诊${l.place ? '：' + esc(l.place) : ''}`;
+  return esc(symName(l.symptomId));
+}
+function logColor(l) {
+  const k = kindOf(l);
+  return k === 'vaccine' ? VAC_COLOR : k === 'visit' ? VISIT_COLOR : symColor(l.symptomId);
+}
 function summaryOf(l) {
+  if (kindOf(l) === 'vaccine') {
+    const due = vacDue(l);
+    return due ? `${l.years} 年有效，${dot(due)} 到期` : '';
+  }
+  if (kindOf(l) === 'visit') return '';
   const s = symOf(l.symptomId);
   if (!s) return '';
   const parts = [];
@@ -1462,7 +1523,7 @@ function viewHealth(kind) {
       </div>
       ${svg(P.chev, 20)}</a>`;
   }).join('');
-  return topbar(backBtn('#/'), KINDS[kind] + '的生病记录',
+  return topbar(backBtn('#/'), KINDS[kind] + '的健康簿',
       `<a class="icon-btn" href="#/symptoms" aria-label="症状设置">${svg(P.gear)}</a>`) +
     `<main class="pad">
       ${ms.length ? `<div class="mems">${rows}</div>` : ''}
@@ -1560,7 +1621,8 @@ function calRange(anchor, view) {
 function carryByDate(id, filter, from, to) {
   const out = {};
   const bySym = {};
-  [...state.logs.values()].filter(l => l.memberId === id && (!filter || l.symptomId === filter))
+  [...state.logs.values()]
+    .filter(l => l.memberId === id && kindOf(l) === 'symptom' && (!filter || l.symptomId === filter))
     .forEach(l => { (bySym[l.symptomId] = bySym[l.symptomId] || []).push(l); });
   Object.entries(bySym).forEach(([sid, arr]) => {
     const sy = symOf(sid);
@@ -1582,13 +1644,29 @@ function carryByDate(id, filter, from, to) {
 function dotsByDate(id, filter, from, to) {
   const by = {};
   [...state.logs.values()]
-    .filter(l => l.memberId === id && l.date >= from && l.date <= to && (!filter || l.symptomId === filter))
-    .forEach(l => { (by[l.date] = by[l.date] || []).push(l.symptomId); });
+    .filter(l => l.memberId === id && l.date >= from && l.date <= to && (!filter || logKey(l) === filter))
+    .forEach(l => { (by[l.date] = by[l.date] || []).push(logKey(l)); });
   return by;
+}
+function logKey(l) {
+  const k = kindOf(l);
+  return k === 'symptom' ? l.symptomId : k;
+}
+function keyColor(key) {
+  return key === 'vaccine' ? VAC_COLOR : key === 'visit' ? VISIT_COLOR : symColor(key);
+}
+function keyName(key) {
+  return key === 'vaccine' ? '疫苗' : key === 'visit' ? '就诊' : symName(key);
+}
+function markHtml(key, size) {
+  if (key === 'vaccine' || key === 'visit') {
+    return `<span class="kicon" style="color:${keyColor(key)}">${svg(key === 'vaccine' ? P.vaccine : P.visit, size || 13, 2)}</span>`;
+  }
+  return `<i style="background:${keyColor(key)}"></i>`;
 }
 function dayCell(date, n, syms, soft) {
   const cls = 'cal-cell day' + (state.calDay === date ? ' on' : '') + (date === todayStr() ? ' today' : '');
-  const dots = syms.slice(0, 3).map(sid => `<i style="background:${symColor(sid)}"></i>`).join('') +
+  const dots = syms.slice(0, 3).map(k => markHtml(k)).join('') +
     (soft || []).filter(sid => !syms.includes(sid)).slice(0, 3)
       .map(sid => `<i class="soft" style="background:${symColor(sid)}"></i>`).join('');
   return `<button class="${cls}" data-act="cal-day" data-v="${date}">
@@ -1633,7 +1711,7 @@ function calHtml(id, anchor, view, filter) {
         const date = `${y}-${pad2(m)}-${pad2(d)}`;
         const syms = [...new Set(by[date] || [])];
         const sf = [...new Set(soft[date] || [])];
-        const bg = syms.length ? `background:${symColor(syms[0])}` : (sf.length ? `background:${symColor(sf[0])};opacity:.35` : '');
+        const bg = syms.length ? `background:${keyColor(syms[0])}` : (sf.length ? `background:${symColor(sf[0])};opacity:.35` : '');
         cells += `<button class="hc${state.calDay === date ? ' on' : ''}${date === todayStr() ? ' now' : ''}" data-act="cal-day" data-v="${date}" aria-label="${m} 月 ${d} 日"${bg ? ` style="${bg}"` : ''}></button>`;
       }
       rows += `<div class="yr-row"><button class="yr-m" data-act="cal-month" data-v="${y}-${pad2(m)}-01">${m}</button><div class="yr-days">${cells}</div></div>`;
@@ -1655,10 +1733,14 @@ function calHtml(id, anchor, view, filter) {
 }
 function logRow(l) {
   const sum = summaryOf(l);
+  const k = kindOf(l);
+  const mark = k === 'symptom'
+    ? `<i class="dot" style="background:${logColor(l)}"></i>`
+    : `<span class="kicon" style="color:${logColor(l)}">${svg(k === 'vaccine' ? P.vaccine : P.visit, 18, 1.8)}</span>`;
   return `<a class="log-row" href="#/log/${l.id}">
-    <i class="dot" style="background:${symColor(l.symptomId)}"></i>
+    ${mark}
     <div class="log-b">
-      <b>${dot(l.date).slice(5)} ${esc(symName(l.symptomId))}${l.healed ? '<span class="healed">好了</span>' : ''}</b>
+      <b>${dot(l.date).slice(5)} ${logTitle(l)}${l.healed ? '<span class="healed">已痊愈</span>' : ''}</b>
       ${sum ? `<span class="row-s">${esc(sum)}</span>` : ''}
       ${l.note ? `<span class="row-s">${esc(l.note)}</span>` : ''}
     </div>
@@ -1672,19 +1754,33 @@ function viewMember(id) {
   const anchor = state.cal || todayStr();
   const filter = state.symFilter;
   const range = calRange(anchor, state.calView);
-  const symIds = [...new Set(logs.map(l => l.symptomId))];
+  const symIds = [...new Set(logs.map(logKey))];
+  const rb = rangeBounds();
   const counts = {};
-  symIds.forEach(sid => { counts[sid] = episodeCount(id, sid); });
+  symIds.forEach(k => {
+    counts[k] = (k === 'vaccine' || k === 'visit')
+      ? logs.filter(l => logKey(l) === k && l.date >= rb.from && l.date <= rb.to).length
+      : episodeCount(id, k, rb.from, rb.to);
+  });
   const totalTimes = symIds.reduce((n, sid) => n + counts[sid], 0);
   const chips = symIds.length ? `<nav class="pills">
-      <button class="pill${filter ? '' : ' on'}" data-act="sym-filter" data-v="">全部 ${totalTimes} 次</button>
-      ${symIds.map(sid => `<button class="pill${filter === sid ? ' on' : ''}" data-act="sym-filter" data-v="${sid}">
-        <i class="dot" style="background:${symColor(sid)}"></i>${esc(symName(sid))} ${counts[sid]} 次</button>`).join('')}
+      <button class="pill${filter ? '' : ' on'}" data-act="sym-filter" data-v="">全部 ${totalTimes} 次 · ${rb.label}${svg(P.down, 14)}</button>
+      ${symIds.map(k => `<button class="pill${filter === k ? ' on' : ''}" data-act="sym-filter" data-v="${k}">
+        ${k === 'vaccine' || k === 'visit' ? markHtml(k, 15) : `<i class="dot" style="background:${symColor(k)}"></i>`}${esc(keyName(k))} ${counts[k]} 次</button>`).join('')}
     </nav>` : '';
-  let shown = logs.filter(l => (!filter || l.symptomId === filter));
-  shown = state.calDay ? shown.filter(l => l.date === state.calDay)
-    : shown.filter(l => l.date >= range.from && l.date <= range.to);
-  const listTitle = state.calDay ? `${dot(state.calDay)} 的记录` : `${range.label}的记录`;
+  let shown = logs.filter(l => (!filter || logKey(l) === filter));
+  let listTitle;
+  if (state.calDay) {
+    shown = shown.filter(l => l.date === state.calDay);
+    listTitle = `${dot(state.calDay)} 的记录`;
+  } else if (filter) {
+    listTitle = `${keyName(filter)}的全部记录`;
+  } else {
+    shown = shown.filter(l => l.date >= rb.from && l.date <= rb.to);
+    listTitle = `${rb.label}的记录`;
+  }
+  if (!state.sortAsc) shown = shown.slice().reverse();
+  const sortBtn = `<button class="icon-btn small" data-act="sort-toggle" aria-label="${state.sortAsc ? '改成从新到旧' : '改成从旧到新'}">${svg(state.sortAsc ? P.down : P.up, 20)}</button>`;
   return topbar(backBtn('#/health/' + me.kind), esc(me.name),
       `<a class="icon-btn" href="#/member/edit/${me.id}" aria-label="资料">${svg(P.edit)}</a>`) +
     `<section class="hero" style="padding-bottom:6px">
@@ -1703,7 +1799,10 @@ function viewMember(id) {
       ${(state.calView === 'year' && !state.calDay)
         ? '<p class="hint" style="text-align:center">点某一天，看那天的记录；点左边的月份数字，切到那个月</p>'
         : `<div class="sec-row"><h2 class="sec">${listTitle}</h2>
-            ${state.calDay ? '<button class="link-btn" data-act="cal-day" data-v="">看整段</button>' : ''}</div>
+            <div style="display:flex;align-items:center;gap:6px">
+              ${state.calDay ? '<button class="link-btn" data-act="cal-day" data-v="">看整段</button>' : ''}
+              ${sortBtn}
+            </div></div>
           ${shown.length ? `<div class="logs">${shown.map(logRow).join('')}</div>`
             : '<p class="empty">这段时间没有记录</p>'}`}
     </main>
@@ -1789,13 +1888,16 @@ function viewLog(mode, arg) {
     if (mode === 'new') {
       if (!state.members.get(arg)) return notFound();
       const first = [...state.symptoms.values()][0];
-      lf = { key, memberId: arg, symptomId: first ? first.id : '', date: state.calDay || todayStr(), values: {}, photos: [], note: '', healed: false };
+      lf = { key, kind: 'symptom', memberId: arg, symptomId: first ? first.id : '',
+        date: state.calDay || todayStr(), values: {}, photos: [], note: '', healed: false,
+        vacName: '', years: 1, remindDays: 60, place: '' };
     } else {
       const l = state.logs.get(arg);
       if (!l) return notFound();
-      lf = { key, id: l.id, memberId: l.memberId, symptomId: l.symptomId, date: l.date,
+      lf = { key, id: l.id, kind: kindOf(l), memberId: l.memberId, symptomId: l.symptomId, date: l.date,
         values: clone(l.values || {}), photos: (l.photos || []).slice(), note: l.note || '',
-        healed: !!l.healed, createdAt: l.createdAt };
+        healed: !!l.healed, vacName: l.vacName || '', years: l.years || 1,
+        remindDays: l.remindDays || 60, place: l.place || '', createdAt: l.createdAt };
     }
   }
   const me = state.members.get(lf.memberId);
@@ -1804,9 +1906,44 @@ function viewLog(mode, arg) {
   const syms = [...state.symptoms.values()];
   const ep = lf.id ? episodeOf(lf.memberId, lf.symptomId, lf.date) : null;
 
+  const kindSeg = `<div class="seg3" style="margin-bottom:4px">${Object.entries(LOG_KINDS).map(([k, l]) =>
+    `<button data-act="lf-kind" data-v="${k}" class="${lf.kind === k ? 'on' : ''}">${l}</button>`).join('')}</div>`;
+
   const symChips = `<div class="quick">
     ${syms.map(s => `<button class="opt-chip${s.id === lf.symptomId ? ' on' : ''}" data-act="pick-sym" data-v="${s.id}" style="${s.id === lf.symptomId ? `background:${s.color};border-color:${s.color};color:${textOn(s.color)}` : ''}">${esc(s.name)}</button>`).join('')}
     <button class="opt-chip add" data-act="new-sym">+ 新症状</button></div>`;
+
+  const pickList = (listName, cur, act) => {
+    const opts = [...new Set([...listItems(listName), ...(cur ? [cur] : [])])];
+    return `<div class="quick">
+      ${opts.map(o => `<button class="opt-chip${o === cur ? ' on' : ''}" data-act="${act}" data-v="${esc(o)}">${o === cur ? svg(P.check, 15, 2.6) : ''}${esc(o)}</button>`).join('')}
+      <button class="opt-chip add" data-act="${act}-add">+ 加一项</button></div>`;
+  };
+
+  const due = lf.kind === 'vaccine' && lf.date ? vacDue({ date: lf.date, years: lf.years }) : '';
+  const remindOn = due ? addDays(due, -lf.remindDays) : '';
+  const vacBody = `
+    <div class="field-l">打的什么疫苗</div>
+    ${pickList(VAC_LIST, lf.vacName, 'vac-pick')}
+    <div class="card" style="margin-top:16px">
+      <div class="line"><span>有效期</span>
+        <div class="seg tiny">
+          <button data-act="lf-years" data-v="1" class="${Number(lf.years) === 1 ? 'on' : ''}">1 年</button>
+          <button data-act="lf-years" data-v="3" class="${Number(lf.years) === 3 ? 'on' : ''}">3 年</button>
+        </div>
+      </div>
+      <div class="line"><span>到期提醒</span>
+        <div class="seg tiny">
+          <button data-act="lf-remind" data-v="60" class="${Number(lf.remindDays) === 60 ? 'on' : ''}">提前 60 天</button>
+          <button data-act="lf-remind" data-v="90" class="${Number(lf.remindDays) === 90 ? 'on' : ''}">提前 90 天</button>
+        </div>
+      </div>
+    </div>
+    ${due ? `<p class="hint">${dot(due)} 到期，会在 ${dot(remindOn)} 提醒你</p>` : ''}`;
+
+  const visitBody = `
+    <div class="field-l">去了哪里</div>
+    ${pickList(PLACE_LIST, lf.place, 'place-pick')}`;
 
   const sections = sym ? sectionsHtml(sym, lf.values) : '';
 
@@ -1818,23 +1955,25 @@ function viewLog(mode, arg) {
 
   const cancel = '#/member/' + lf.memberId;
   return topbar(`<button class="text-btn" data-act="cancel-log" data-to="${cancel}">取消</button>`,
-      `${esc(me.name)} · ${mode === 'new' ? '添加记录' : '记录'}`, '') +
+      `${esc(me.name)} · ${mode === 'new' ? '添加记录' : LOG_KINDS[lf.kind] + '记录'}`, '') +
     `<main class="pad form" style="padding-bottom:40px">
       <input type="file" id="lphoto-in" accept="image/*" hidden>
+      ${kindSeg}
       <div class="card">
         <label class="line"><span>日期</span><input data-lf="date" type="date" value="${lf.date}"></label>
-        ${sym && sym.healTrack !== false ? `<div class="line"><span>痊愈了吗</span>
+        ${lf.kind === 'symptom' && sym && sym.healTrack !== false ? `<div class="line"><span>痊愈了吗</span>
           <div class="seg tiny">
             <button data-act="lf-healed" data-v="0" class="${lf.healed ? '' : 'on'}">未痊愈</button>
             <button data-act="lf-healed" data-v="1" class="${lf.healed ? 'on' : ''}">已痊愈</button>
           </div>
         </div>` : ''}
       </div>
-      ${ep && ep.day > 1 && sym && sym.healTrack !== false ? `<p class="hint">这次从 ${dot(ep.from)} 开始，这是第 ${ep.day} 天</p>` : ''}
-      <div class="field-l">症状</div>
-      ${symChips}
-      ${sections}
-      ${sym ? `<button class="btn wide addbtn" data-act="sec-add">${svg(P.plus, 20, 2.2)}加一个板块</button>` : '<p class="hint">先选一个症状，下面才会出现要填的内容</p>'}
+      ${lf.kind === 'symptom' && ep && ep.day > 1 && sym && sym.healTrack !== false ? `<p class="hint">这次从 ${dot(ep.from)} 开始，这是第 ${ep.day} 天</p>` : ''}
+      ${lf.kind === 'symptom' ? `<div class="field-l">症状</div>
+        ${symChips}
+        ${sections}
+        ${sym ? `<button class="btn wide addbtn" data-act="sec-add">${svg(P.plus, 20, 2.2)}加一个板块</button>` : '<p class="hint">先选一个症状，下面才会出现要填的内容</p>'}`
+        : lf.kind === 'vaccine' ? vacBody : visitBody}
       <div class="field-l">备注</div>
       <textarea id="lf-note" class="note-input" data-lf="note" rows="3" placeholder="随便写点什么">${esc(lf.note)}</textarea>
       <div class="field-l">照片</div>
@@ -1844,18 +1983,68 @@ function viewLog(mode, arg) {
     </main>`;
 }
 function saveLog() {
-  if (!lf.symptomId) { toast('先选一个症状'); return; }
+  const k = lf.kind || 'symptom';
+  if (k === 'symptom' && !lf.symptomId) { toast('先选一个症状'); return; }
+  if (k === 'vaccine' && !lf.vacName) { toast('先填疫苗名字'); return; }
   const l = {
-    id: lf.id || uid(), memberId: lf.memberId, symptomId: lf.symptomId,
-    date: lf.date || todayStr(), values: lf.values, photos: lf.photos,
-    note: lf.note.trim(), healed: !!lf.healed, createdAt: lf.createdAt || todayStr()
+    id: lf.id || uid(), kind: k, memberId: lf.memberId,
+    date: lf.date || todayStr(), photos: lf.photos, note: lf.note.trim(),
+    createdAt: lf.createdAt || todayStr()
   };
+  if (k === 'symptom') {
+    l.symptomId = lf.symptomId;
+    l.values = lf.values;
+    l.healed = !!lf.healed;
+  } else if (k === 'vaccine') {
+    l.vacName = lf.vacName;
+    l.years = Number(lf.years) || 1;
+    l.remindDays = Number(lf.remindDays) || 60;
+  } else {
+    l.place = lf.place || '';
+  }
   if (tooBig(l)) return;
   const to = '#/member/' + l.memberId;
+  const me = state.members.get(l.memberId);
   lf = null;
   saveDoc('logs', l);
   if (cameFrom === to) history.back(); else goReplace(to);
   toast('已保存');
+  if (k === 'vaccine') {
+    const due = vacDue(l);
+    const rd = addDays(due, -l.remindDays);
+    if (daysUntil(rd) >= 0) afterNav(() => askVaccineCal(l, me));
+  }
+}
+function askVaccineCal(l, me) {
+  const due = vacDue(l);
+  const rd = addDays(due, -l.remindDays);
+  showLayer(`<div class="scrim" data-act="close"></div>
+    <div class="sheet" role="dialog" aria-label="疫苗提醒">
+      <h2 class="sheet-t">加个日历提醒？</h2>
+      <p>${esc(me ? me.name : '')} 的 ${esc(l.vacName)} ${dot(due)} 到期，会在 ${dot(rd)} 上午 9 点提醒。</p>
+      <div class="actions2">
+        <button class="btn" data-act="close">以后再说</button>
+        <button class="btn primary" data-act="vac-cal" data-id="${l.id}">加到日历</button>
+      </div></div>`);
+}
+function vaccineIcs(l, me) {
+  const due = vacDue(l);
+  const rd = addDays(due, -l.remindDays);
+  const d1 = rd.replace(/-/g, '');
+  const d2 = addDays(rd, 1).replace(/-/g, '');
+  const now = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+  const e = x => String(x).replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\n/g, '\\n');
+  const who = me ? me.name : '';
+  const title = `疫苗到期：${who} ${l.vacName}`;
+  const desc = `${dot(l.date)} 打的 ${l.vacName}，${l.years} 年有效，${dot(due)} 到期。`;
+  return [
+    'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//yaoxiang//CN', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH',
+    'BEGIN:VEVENT', `UID:${l.id}-vac@yaoxiang`, `DTSTAMP:${now}`,
+    `DTSTART;VALUE=DATE:${d1}`, `DTEND;VALUE=DATE:${d2}`,
+    `SUMMARY:${e(title)}`, `DESCRIPTION:${e(desc)}`,
+    'BEGIN:VALARM', 'ACTION:DISPLAY', `DESCRIPTION:${e(title)}`, 'TRIGGER:PT9H', 'END:VALARM',
+    'END:VEVENT', 'END:VCALENDAR', ''
+  ].join('\r\n');
 }
 function delLog() {
   if (!confirm('删除这条记录？')) return;
@@ -1868,6 +2057,37 @@ function delLog() {
 }
 
 /* ---------- 板块与选项的管理 ---------- */
+let rangePick = null;
+function openRangeSheet() {
+  const cur = (state.range || {}).kind || 'year';
+  const opt = (k, l) => `<button data-act="range-set" data-v="${k}"><span>${l}</span>${cur === k ? `<span class="accent-t">${svg(P.check, 16, 2.6)}</span>` : ''}</button>`;
+  showLayer(`<div class="scrim" data-act="close"></div>
+    <div class="sheet menu-sheet" role="dialog" aria-label="看哪段时间">
+      <h2 class="sheet-t">看哪段时间</h2>
+      ${opt('month', '当月')}
+      ${opt('half', '近半年')}
+      ${opt('year', '今年')}
+      ${opt('all', '全部')}
+      <button data-act="range-custom"><span>自己选日期</span><span class="muted">${cur === 'custom' ? rangeBounds().label : ''}</span></button>
+      <button data-act="close">取消</button>
+    </div>`);
+}
+function openCustomRange() {
+  const rb = rangeBounds();
+  rangePick = { from: rb.from === '0000-01-01' ? todayStr().slice(0, 4) + '-01-01' : rb.from, to: rb.to === '9999-12-31' ? todayStr() : rb.to };
+  showLayer(`<div class="scrim" data-act="close"></div>
+    <div class="sheet" role="dialog" aria-label="自己选日期">
+      <h2 class="sheet-t">自己选日期</h2>
+      <div class="card">
+        <label class="line"><span>从</span><input type="date" data-rp="from" value="${rangePick.from}"></label>
+        <label class="line"><span>到</span><input type="date" data-rp="to" value="${rangePick.to}"></label>
+      </div>
+      <div class="actions2">
+        <button class="btn" data-act="close">取消</button>
+        <button class="btn primary" data-act="range-custom-ok">确定</button>
+      </div>
+    </div>`);
+}
 function askText(title, placeholder, cb) {
   ask = { cb, value: '' };
   showLayer(`<div class="scrim" data-act="close-ask"></div>
@@ -2107,7 +2327,32 @@ const actions = {
     state.calDay = (v && state.calDay !== v) ? v : '';
     render();
   },
-  'sym-filter': el => { state.symFilter = el.dataset.v; render(); },
+  'sym-filter': el => {
+    const v = el.dataset.v;
+    if (!v && !state.symFilter) { openRangeSheet(); return; }
+    state.symFilter = v;
+    state.calDay = '';
+    if (v) {
+      const id = route()[1];
+      const arr = [...state.logs.values()]
+        .filter(l => l.memberId === id && logKey(l) === v)
+        .sort((a, b) => a.date.localeCompare(b.date));
+      if (arr.length) state.cal = arr[arr.length - 1].date;
+    }
+    render();
+  },
+  'sort-toggle': () => { state.sortAsc = !state.sortAsc; render(); },
+  'range-set': el => { state.range = { kind: el.dataset.v }; closeLayer(); render(); },
+  'range-custom': () => openCustomRange(),
+  'range-custom-ok': () => {
+    if (!rangePick.from || !rangePick.to) { toast('两个日期都要选'); return; }
+    const from = rangePick.from <= rangePick.to ? rangePick.from : rangePick.to;
+    const to = rangePick.from <= rangePick.to ? rangePick.to : rangePick.from;
+    state.range = { kind: 'custom', from, to };
+    rangePick = null;
+    closeLayer();
+    render();
+  },
   'pick-sym': el => { lf.symptomId = el.dataset.v; render(); },
   'new-sym-page': () => askText('新症状叫什么', '比如 呕吐、软便', name => {
     const sy = newSymptom(name);
@@ -2185,6 +2430,26 @@ const actions = {
     closeLayer();
   },
   'lf-healed': el => { lf.healed = el.dataset.v === '1'; render(); },
+  'lf-kind': el => { lf.kind = el.dataset.v; render(); },
+  'lf-years': el => { lf.years = Number(el.dataset.v); render(); },
+  'lf-remind': el => { lf.remindDays = Number(el.dataset.v); render(); },
+  'vac-pick': el => { lf.vacName = lf.vacName === el.dataset.v ? '' : el.dataset.v; render(); },
+  'vac-pick-add': () => askText('疫苗名字', '比如 狂犬、猫三联', v => { addListItem(VAC_LIST, v); lf.vacName = v; render(); }),
+  'place-pick': el => { lf.place = lf.place === el.dataset.v ? '' : el.dataset.v; render(); },
+  'place-pick-add': () => askText('去了哪里', '比如 萌宠侍卫', v => { addListItem(PLACE_LIST, v); lf.place = v; render(); }),
+  'vac-cal': el => {
+    const l = state.logs.get(el.dataset.id);
+    if (!l) { closeLayer(); return; }
+    const me = state.members.get(l.memberId);
+    const name = `${l.vacName}-${vacDue(l)}.ics`.replace(/[\\/:*?"<>|]/g, '_');
+    const blob = new Blob([vaccineIcs(l, me)], { type: 'text/calendar' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+    closeLayer();
+  },
   'save-log': saveLog,
   'del-log': delLog,
   'close-ask': () => { ask = null; closeLayer(); },
@@ -2213,6 +2478,7 @@ document.addEventListener('click', e => {
 document.addEventListener('input', e => {
   const t = e.target;
   if (t.id === 'q') { state.search = t.value; render(); return; }
+  if (t.dataset.rp && rangePick) { rangePick[t.dataset.rp] = t.value; return; }
   if (t.id === 'ask-in' && ask) { ask.value = t.value; return; }
   if (t.dataset.mf && mform) {
     mform[t.dataset.mf] = t.value;
@@ -2223,6 +2489,7 @@ document.addEventListener('input', e => {
   if (t.dataset.lf && lf) {
     lf[t.dataset.lf] = t.value;
     if (t.tagName === 'TEXTAREA') grow(t);
+    else if (t.dataset.lf === 'date' && lf.kind === 'vaccine') render();
     return;
   }
   if (t.dataset.sec && lf) { lf.values[t.dataset.sec] = t.value; return; }
