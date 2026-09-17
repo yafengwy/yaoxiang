@@ -184,11 +184,33 @@ button.tag{height:34px;padding:0 12px;font-size:14px;border-radius:10px;display:
 .drawer hr{border:0;border-top:1px solid var(--line);margin:16px 12px;width:auto}
 .drawer p{margin:4px 12px;font-size:13px}
 
-.viewer{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:20px;border:0;background:none;width:100%}
+.viewer{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:20px}
 .viewer img{max-width:100%;max-height:100%;border-radius:12px}
 
 #toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom) + 100px);transform:translate(-50%,20px);background:var(--ink);color:var(--bg);padding:10px 18px;border-radius:12px;font-size:15px;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:30;max-width:86vw;text-align:center}
 #toast.show{opacity:1;transform:translate(-50%,0)}
+.photos{display:flex;flex-wrap:wrap;gap:8px}
+.photo-thumb{width:92px;height:92px;border-radius:16px;overflow:hidden;border:0;padding:0;background:var(--ph);position:relative}
+.photo-thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.cover-tag{position:absolute;left:0;right:0;bottom:0;background:rgba(0,0,0,.45);color:#fff;font-size:11px;padding:2px 0;text-align:center}
+.photo-add{width:92px;height:92px;border-radius:16px;border:1.5px dashed var(--line);background:var(--card);color:var(--muted);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-size:13px;padding:0}
+.photo-add svg{color:var(--accent)}
+.strip{display:flex;gap:8px;overflow-x:auto;padding:0 20px 12px;scrollbar-width:none}
+.strip::-webkit-scrollbar{display:none}
+.strip button{width:64px;height:64px;border-radius:14px;overflow:hidden;border:0;padding:0;flex-shrink:0;background:var(--ph)}
+.strip img{width:100%;height:100%;object-fit:cover;display:block}
+.note-box{white-space:pre-wrap;padding:14px 0;font-size:16px}
+.line textarea{flex:1;min-width:0;border:0;background:none;font:inherit;font-size:16px;padding:14px 0;resize:none;text-align:right;line-height:1.5;overflow:hidden}
+.crop-wrap{width:min(320px,78vw);height:min(320px,78vw);margin:10px auto 14px;border-radius:18px;overflow:hidden;background:#000;position:relative;touch-action:none}
+.crop-wrap img{position:absolute;left:50%;top:50%;transform-origin:center;will-change:transform;-webkit-user-drag:none;user-select:none;max-width:none}
+.crop-tools{display:flex;align-items:center;gap:10px}
+.crop-tools input[type=range]{flex:1;accent-color:var(--accent)}
+.viewer-x{position:absolute;top:calc(env(safe-area-inset-top) + 8px);right:12px;color:#fff;background:rgba(255,255,255,.2);border-radius:22px}
+.viewer-nav{position:absolute;left:0;right:0;bottom:calc(env(safe-area-inset-bottom) + 24px);display:flex;align-items:center;justify-content:center;gap:20px;color:#fff;font-size:15px}
+.viewer-nav button{width:48px;height:48px;border-radius:24px;border:0;background:rgba(255,255,255,.2);color:#fff;display:flex;align-items:center;justify-content:center}
+.menu-sheet button{width:100%;min-height:54px;border:0;border-bottom:1px solid var(--line);background:none;font-size:17px;text-align:left;padding:0}
+.menu-sheet button:last-child{border-bottom:0;color:var(--muted)}
+.menu-sheet .danger{color:var(--bad)}
 .login{padding-top:calc(env(safe-area-inset-top) + 60px)}
 .login .card{margin-top:24px}
 .login .text-btn{display:flex;margin:12px auto 0}
@@ -226,6 +248,9 @@ const BOXES = { human: '人用药', cat: '猫用药' };
 const REMIND_OPTIONS = [30, 60, 120];
 const LOG_TEXT = { add: '添加', in: '入库', use: '用完', open: '开封' };
 const FB_VER = '10.12.2';
+const MAX_PHOTOS = 6;
+const PHOTO_PX = 640;
+const PHOTO_Q = 0.62;
 
 const $app = document.getElementById('app');
 const $layer = document.getElementById('layer');
@@ -406,9 +431,14 @@ function closeLayer() {
 const topbar = (left, title, right) =>
   `<header class="top"><div>${left || ''}</div><h1 class="top-t">${title || ''}</h1><div class="top-r">${right || ''}</div></header>`;
 const backBtn = href => `<a class="icon-btn" href="${href}" aria-label="返回">${svg(P.back, 24)}</a>`;
+function photosOf(m) {
+  if (m.photos && m.photos.length) return m.photos;
+  return m.photo ? [m.photo] : [];
+}
 function photoHtml(m, cls) {
-  return m.photo
-    ? `<img class="${cls}" src="${esc(m.photo)}" alt="">`
+  const p = photosOf(m)[0];
+  return p
+    ? `<img class="${cls}" src="${esc(p)}" alt="">`
     : `<div class="${cls} ph">${svg(P.bottle, cls === 'thumb' ? 26 : 34, 1.6)}</div>`;
 }
 function tagsHtml(m, link) {
@@ -422,7 +452,7 @@ function daysHtml(m) {
   const e = nearestExp(m);
   if (!e) return `<div class="days st-empty"><span>已用完</span></div>`;
   const d = daysUntil(e);
-  if (d < 0) return `<div class="days st-bad"><span>过期</span><b class="num">${-d}</b><span>天</span></div>`;
+  if (d < 0) return `<div class="days st-bad"><span>已过期</span><b class="num">${-d}</b><span>天</span></div>`;
   return `<div class="days st-${status(m)}"><b class="num">${d}</b><span>天</span></div>`;
 }
 const notFound = () => topbar(backBtn('#/'), '', '') + '<p class="empty">找不到这个页面</p>';
@@ -557,16 +587,24 @@ function viewMed(id) {
     <div class="log"><span class="log-d">${dot(l.date)}</span>
       <span>${LOG_TEXT[l.type] || l.type} ${l.qty} 件<small>（${dot(l.exp)} 到期）</small>${l.note ? `<br><small>${esc(l.note)}</small>` : ''}</span></div>`).join('')}</div>` : '';
 
-  const img = m.photo
-    ? `<button class="hero-btn" data-act="photo" aria-label="查看大图">${photoHtml(m, 'hero-img')}</button>`
+  const pics = photosOf(m);
+  const img = pics.length
+    ? `<button class="hero-btn" data-act="photo" data-id="${m.id}" data-i="0" aria-label="查看大图">${photoHtml(m, 'hero-img')}</button>`
     : photoHtml(m, 'hero-img');
+  const strip = pics.length > 1
+    ? `<div class="strip">${pics.map((p, i) => `<button data-act="photo" data-id="${m.id}" data-i="${i}" aria-label="查看第 ${i + 1} 张照片"><img src="${esc(p)}" alt=""></button>`).join('')}</div>`
+    : '';
+  const noteHtml = m.note
+    ? `<h2 class="sec">剂量 / 备注</h2><div class="card"><div class="note-box">${esc(m.note)}</div></div>` : '';
 
   return topbar(backBtn('#/box/' + m.box), '药品详情',
       `<a class="icon-btn" href="#/edit/${m.id}" aria-label="编辑">${svg(P.edit)}</a>`) +
     `<section class="hero">${img}
       <div class="hero-b"><h2>${esc(m.name)}</h2>${m.spec ? `<p>${esc(m.spec)}</p>` : ''}
         ${tagsHtml(m, true)}<span class="chip ok">${BOXES[m.box]}</span></div></section>
+    ${strip}
     <main class="pad detail">
+      ${noteHtml}
       <div class="sec-row"><h2 class="sec">期限</h2>${distance}</div>
       <div class="card">${remind}</div>
       <h2 class="sec">批次</h2>${batches}
@@ -715,6 +753,18 @@ function addToCalendar(m, exp) {
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 60000);
 }
+function goReplace(hash) {
+  location.replace(location.pathname + location.search + hash);
+}
+function askCalendarList(m, exps) {
+  showLayer(`<div class="scrim" data-act="close"></div>
+    <div class="sheet menu-sheet" role="dialog" aria-label="日历提醒">
+      <h2 class="sheet-t">加日历提醒</h2>
+      <p>有 ${exps.length} 个过期日期，一个一个加</p>
+      ${exps.map(e => `<button data-act="cal" data-keep="1" data-id="${m.id}" data-exp="${e}">${dot(e)} 到期，提醒 ${dot(addDays(e, -m.remindDays))}</button>`).join('')}
+      <button data-act="close">完成</button>
+    </div>`);
+}
 function askCalendar(m, exp) {
   const rd = addDays(exp, -m.remindDays);
   showLayer(`<div class="scrim" data-act="close"></div>
@@ -732,11 +782,11 @@ function viewForm(mode, arg) {
   const key = mode + ':' + arg;
   if (!form || form.key !== key) {
     if (mode === 'add') {
-      form = { key, box: BOXES[arg] ? arg : 'cat', name: '', spec: '', tags: [], photo: '', exp: '', qty: 1, remindDays: 60, tagDraft: '' };
+      form = { key, box: BOXES[arg] ? arg : 'cat', name: '', spec: '', note: '', tags: [], photos: [], rows: [{ exp: '', qty: 1 }], remindDays: 60, tagDraft: '' };
     } else {
       const m = state.meds.get(arg);
       if (!m) return notFound();
-      form = { key, id: m.id, box: m.box, name: m.name, spec: m.spec || '', tags: (m.tags || []).slice(), photo: m.photo || '', remindDays: m.remindDays || 60, tagDraft: '' };
+      form = { key, id: m.id, box: m.box, name: m.name, spec: m.spec || '', note: m.note || '', tags: (m.tags || []).slice(), photos: photosOf(m).slice(), remindDays: m.remindDays || 60, tagDraft: '', rows: liveBatches(m).map(b => ({ id: b.id, exp: b.exp, qty: b.qty, opened: b.opened || null })) };
     }
   }
   const f = form;
@@ -747,13 +797,18 @@ function viewForm(mode, arg) {
   return topbar(`<a class="text-btn" href="${cancel}">取消</a>`, mode === 'add' ? '添加药品' : '编辑药品', '') +
     `<main class="pad form">
       <input type="file" id="photo-in" accept="image/*" hidden>
-      <button class="photo-pick" data-act="pick-photo" aria-label="选择照片">${f.photo
-        ? `<img src="${esc(f.photo)}" alt="">`
-        : `${svg(P.camera, 30, 1.8)}<span>拍照或从相册选择</span>`}</button>
+      <div class="photos">
+        ${f.photos.map((p, i) => `<button class="photo-thumb" data-act="photo-menu" data-i="${i}" aria-label="第 ${i + 1} 张照片">
+          <img src="${esc(p)}" alt="">${i === 0 ? '<span class="cover-tag">封面</span>' : ''}</button>`).join('')}
+        ${f.photos.length < MAX_PHOTOS
+          ? `<button class="photo-add" data-act="pick-photo">${svg(P.camera, 24, 1.8)}<span>加照片</span></button>` : ''}
+      </div>
+      <p class="hint">第一张是封面，最多 ${MAX_PHOTOS} 张。点已有的照片可以放大调整、换一张或删除。</p>
 
       <div class="card">
         <label class="line"><span>名称</span><input id="f-name" data-f="name" type="text" placeholder="例如：甲硝唑" value="${esc(f.name)}"></label>
         <label class="line"><span>规格</span><input id="f-spec" data-f="spec" type="text" placeholder="例如：200mg，100 片" value="${esc(f.spec)}"></label>
+        <label class="line"><span>剂量 / 备注</span><textarea id="f-note" data-f="note" rows="2" placeholder="例如：团团 4.2kg，每次半片">${esc(f.note)}</textarea></label>
       </div>
 
       <div class="field-l">分类</div>
@@ -767,13 +822,17 @@ function viewForm(mode, arg) {
       <div class="seg2">${Object.entries(BOXES).map(([k, l]) =>
         `<button data-act="f-box" data-v="${k}" class="${f.box === k ? 'on' : ''}">${l}</button>`).join('')}</div>
 
-      ${mode === 'add' ? `<div class="card">
-        <label class="line"><span>过期日期</span><input id="f-exp" data-f="exp" type="date" value="${f.exp}"></label>
+      ${f.rows.map((r, i) => `<div class="card">
+        ${i > 0 || r.opened ? `<div class="line"><span>${r.opened ? dot(r.opened) + ' 开封' : '第 ' + (i + 1) + ' 个过期日期'}</span>
+          <button class="link-btn" style="color:var(--bad)" data-act="f-row-del" data-i="${i}">删除</button></div>` : ''}
+        <label class="line"><span>过期日期</span><input id="f-exp-${i}" data-fr="exp" data-i="${i}" type="date" value="${r.exp}"></label>
         <div class="line"><span>数量</span><div class="stepper">
-          <button data-act="f-qty" data-v="-1" aria-label="减少"${f.qty <= 1 ? ' disabled' : ''}>${svg(P.minus, 20, 2.2)}</button>
-          <b class="num">${f.qty}</b>
-          <button data-act="f-qty" data-v="1" aria-label="增加">${svg(P.plus, 20, 2.2)}</button></div></div>
-      </div>` : ''}
+          <button data-act="f-qty" data-i="${i}" data-v="-1" aria-label="减少"${r.qty <= 1 ? ' disabled' : ''}>${svg(P.minus, 20, 2.2)}</button>
+          <b class="num">${r.qty}</b>
+          <button data-act="f-qty" data-i="${i}" data-v="1" aria-label="增加">${svg(P.plus, 20, 2.2)}</button></div></div>
+      </div>`).join('')}
+      <button class="btn wide" data-act="f-row-add">+ 再加一个过期日期</button>
+      <p class="hint">同一种药有不同的过期日期，就分开填。列表里只显示一条，数量是加起来的总数。</p>
 
       <div class="field-l">过期提醒</div>
       <div class="seg3">${REMIND_OPTIONS.map(n =>
@@ -784,9 +843,13 @@ function viewForm(mode, arg) {
       ${mode === 'edit' ? '<button class="btn danger wide" data-act="del-med">删除这个药品</button>' : ''}
     </main>`;
 }
+function formExps() {
+  return [...new Set((form.rows || []).map(r => r.exp).filter(Boolean))].sort();
+}
 function remindHint() {
-  if (!form.exp) return '选好过期日期后，会在过期前提醒你';
-  const rd = addDays(form.exp, -form.remindDays);
+  const exps = formExps();
+  if (!exps.length) return '选好过期日期后，会在过期前提醒你';
+  const rd = addDays(exps[0], -form.remindDays);
   return daysUntil(rd) < 0 ? '已经在提醒期内了，不会再加日历提醒' : `将在 ${dot(rd)} 上午 9 点通过日历提醒你`;
 }
 function commitTag() {
@@ -801,47 +864,186 @@ function saveForm() {
   if (!name) { toast('请填写名称'); return; }
   if (f.id) {
     const m = clone(state.meds.get(f.id));
-    Object.assign(m, { name, spec: f.spec.trim(), tags: f.tags, photo: f.photo, box: f.box, remindDays: f.remindDays });
+    const rows = f.rows.filter(r => r.exp && r.qty > 0);
+    if (!rows.length) { toast('至少留一个过期日期'); return; }
+    Object.assign(m, { name, spec: f.spec.trim(), note: f.note.trim(), tags: f.tags, photos: f.photos, box: f.box, remindDays: f.remindDays });
+    m.batches = rows.map(r => ({ id: r.id || uid(), exp: r.exp, qty: r.qty, opened: r.opened || null }));
+    delete m.photo;
+    if (tooBig(m)) return;
     form = null;
     save(m);
-    location.hash = '#/med/' + m.id;
+    goReplace('#/med/' + m.id);
     toast('已保存');
     return;
   }
-  if (!f.exp) { toast('请选择过期日期'); return; }
+  const exps = formExps();
+  if (!exps.length) { toast('请选择过期日期'); return; }
   const today = todayStr();
+  const batches = exps.map(exp => ({
+    id: uid(),
+    exp,
+    qty: f.rows.filter(r => r.exp === exp).reduce((s, r) => s + r.qty, 0),
+    opened: null
+  }));
   const m = {
-    id: uid(), box: f.box, name, spec: f.spec.trim(), tags: f.tags, photo: f.photo,
-    remindDays: f.remindDays, createdAt: today,
-    batches: [{ id: uid(), exp: f.exp, qty: f.qty, opened: null }], log: []
+    id: uid(), box: f.box, name, spec: f.spec.trim(), note: f.note.trim(), tags: f.tags, photos: f.photos,
+    remindDays: f.remindDays, createdAt: today, batches, log: []
   };
-  addLog(m, 'add', f.exp, f.qty, today, '');
+  batches.forEach(b => addLog(m, 'add', b.exp, b.qty, today, ''));
+  if (tooBig(m)) return;
   form = null;
   save(m);
-  location.hash = '#/med/' + m.id;
-  addToCalendar(m, f.exp);
+  const due = exps.filter(e => daysUntil(addDays(e, -m.remindDays)) >= 0);
+  if (due.length === 1) addToCalendar(m, due[0]);
+  goReplace('#/med/' + m.id);
+  if (due.length > 1) setTimeout(() => askCalendarList(m, due), 0);
 }
 function delMed() {
   const m = state.meds.get(form.id);
   if (!m || !confirm(`删除「${m.name}」？删除后不能恢复。`)) return;
   state.meds.delete(m.id);
   form = null;
-  location.hash = '#/box/' + m.box;
+  goReplace('#/box/' + m.box);
   Promise.resolve().then(() => store.del(m.id)).catch(e => toast('删除失败：' + e.message));
 }
-async function compressImage(file, max, q) {
-  const url = URL.createObjectURL(file);
-  try {
-    const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = url; });
-    const k = Math.min(1, (max || 720) / Math.max(img.naturalWidth, img.naturalHeight));
-    const c = document.createElement('canvas');
-    c.width = Math.round(img.naturalWidth * k);
-    c.height = Math.round(img.naturalHeight * k);
-    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
-    return c.toDataURL('image/jpeg', q || 0.72);
-  } finally {
-    URL.revokeObjectURL(url);
-  }
+function tooBig(m) {
+  const size = new Blob([JSON.stringify(m)]).size;
+  if (size > 900000) { toast('照片太多或太大了，删掉一两张再保存'); return true; }
+  return false;
+}
+
+/* ---------- 照片：查看 / 裁剪 ---------- */
+let viewer = null;
+let cropper = null;
+let photoPending = null;
+
+function openViewer(photos, i) {
+  viewer = { photos, i: Math.max(0, Math.min(i || 0, photos.length - 1)) };
+  renderViewer();
+}
+function renderViewer() {
+  const { photos, i } = viewer;
+  showLayer(`<div class="scrim" data-act="close"></div>
+    <div class="viewer">
+      <img src="${esc(photos[i])}" alt="">
+      <button class="icon-btn viewer-x" data-act="close" aria-label="关闭">${svg(P.close)}</button>
+      ${photos.length > 1 ? `<div class="viewer-nav">
+        <button data-act="v-step" data-v="-1" aria-label="上一张">${svg(P.back, 24)}</button>
+        <span>${i + 1} / ${photos.length}</span>
+        <button data-act="v-step" data-v="1" aria-label="下一张">${svg(P.chev, 24)}</button></div>` : ''}
+    </div>`);
+}
+
+function openCropper(src, onDone) {
+  const img = new Image();
+  img.onload = () => {
+    const V = Math.min(320, Math.round(window.innerWidth * 0.78));
+    cropper = { img, V, base: V / Math.min(img.naturalWidth, img.naturalHeight), s: 1, ox: 0, oy: 0, onDone };
+    renderCropper();
+  };
+  img.onerror = () => toast('照片读取失败，换一张试试');
+  img.src = src;
+}
+function renderCropper() {
+  showLayer(`<div class="scrim" data-act="close-crop"></div>
+    <div class="sheet" role="dialog" aria-label="调整照片">
+      <h2 class="sheet-t">调整照片</h2>
+      <p>拖动可以移动，双指或下面的滑块可以放大缩小</p>
+      <div class="crop-wrap" id="crop-wrap"><img id="crop-img" src="${esc(cropper.img.src)}" alt=""></div>
+      <div class="crop-tools">
+        <button class="icon-btn" data-act="crop-zoom" data-v="-0.25" aria-label="缩小">${svg(P.minus, 20, 2.2)}</button>
+        <input id="crop-range" type="range" min="1" max="4" step="0.01" value="${cropper.s}" aria-label="缩放">
+        <button class="icon-btn" data-act="crop-zoom" data-v="0.25" aria-label="放大">${svg(P.plus, 20, 2.2)}</button>
+      </div>
+      <div class="actions2">
+        <button class="btn" data-act="close-crop">取消</button>
+        <button class="btn primary" data-act="crop-done">完成</button>
+      </div>
+    </div>`);
+  bindCropper();
+}
+function cropApply() {
+  const c = cropper;
+  if (!c) return;
+  const k = c.base * c.s;
+  const maxX = Math.max(0, (c.img.naturalWidth * k - c.V) / 2);
+  const maxY = Math.max(0, (c.img.naturalHeight * k - c.V) / 2);
+  c.ox = Math.min(maxX, Math.max(-maxX, c.ox));
+  c.oy = Math.min(maxY, Math.max(-maxY, c.oy));
+  const el = document.getElementById('crop-img');
+  if (el) el.style.transform = `translate(-50%, -50%) translate(${c.ox}px, ${c.oy}px) scale(${k})`;
+}
+function cropZoom(delta) {
+  cropper.s = Math.min(4, Math.max(1, cropper.s + delta));
+  const r = document.getElementById('crop-range');
+  if (r) r.value = cropper.s;
+  cropApply();
+}
+function bindCropper() {
+  const wrap = document.getElementById('crop-wrap');
+  const range = document.getElementById('crop-range');
+  cropApply();
+  const pts = new Map();
+  let startDist = 0, startScale = 1, last = null;
+  wrap.addEventListener('pointerdown', e => {
+    wrap.setPointerCapture(e.pointerId);
+    pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pts.size === 2) {
+      const [a, b] = [...pts.values()];
+      startDist = Math.hypot(a.x - b.x, a.y - b.y);
+      startScale = cropper.s;
+    }
+    last = { x: e.clientX, y: e.clientY };
+  });
+  wrap.addEventListener('pointermove', e => {
+    if (!pts.has(e.pointerId) || !cropper) return;
+    pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pts.size >= 2) {
+      const [a, b] = [...pts.values()];
+      const d = Math.hypot(a.x - b.x, a.y - b.y);
+      if (startDist) {
+        cropper.s = Math.min(4, Math.max(1, startScale * d / startDist));
+        range.value = cropper.s;
+      }
+    } else if (last) {
+      cropper.ox += e.clientX - last.x;
+      cropper.oy += e.clientY - last.y;
+    }
+    last = { x: e.clientX, y: e.clientY };
+    cropApply();
+  });
+  const up = e => { pts.delete(e.pointerId); last = null; startDist = 0; };
+  wrap.addEventListener('pointerup', up);
+  wrap.addEventListener('pointercancel', up);
+  range.addEventListener('input', () => { cropper.s = Number(range.value); cropApply(); });
+}
+function cropDone() {
+  const c = cropper;
+  const k = c.base * c.s;
+  const half = (c.V / 2) / k;
+  const cx = c.img.naturalWidth / 2 - c.ox / k;
+  const cy = c.img.naturalHeight / 2 - c.oy / k;
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = PHOTO_PX;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, PHOTO_PX, PHOTO_PX);
+  ctx.drawImage(c.img, cx - half, cy - half, half * 2, half * 2, 0, 0, PHOTO_PX, PHOTO_PX);
+  const data = canvas.toDataURL('image/jpeg', PHOTO_Q);
+  const done = c.onDone;
+  cropper = null;
+  closeLayer();
+  done(data);
+}
+function openPhotoMenu(i) {
+  showLayer(`<div class="scrim" data-act="close"></div>
+    <div class="sheet menu-sheet" role="dialog" aria-label="照片操作">
+      <button data-act="ph-edit" data-i="${i}">放大 / 缩小 调整</button>
+      ${i > 0 ? `<button data-act="ph-cover" data-i="${i}">设为封面</button>` : ''}
+      <button data-act="ph-replace" data-i="${i}">换一张</button>
+      <button class="danger" data-act="ph-del" data-i="${i}">删除这张</button>
+      <button data-act="close">取消</button>
+    </div>`);
 }
 
 /* ---------- 设置 / 登录 ---------- */
@@ -954,11 +1156,16 @@ function renderView() {
   }
   $app.innerHTML = html;
 }
+function grow(t) {
+  t.style.height = 'auto';
+  t.style.height = t.scrollHeight + 'px';
+}
 function render() {
   const ae = document.activeElement;
   const fid = ae && ae.id && $app.contains(ae) ? ae.id : null;
   const y = window.scrollY;
   renderView();
+  $app.querySelectorAll('textarea').forEach(grow);
   window.scrollTo(0, y);
   if (fid) {
     const el = document.getElementById(fid);
@@ -979,9 +1186,38 @@ const actions = {
     const q = document.getElementById('q');
     if (q) q.focus();
   },
-  photo: () => {
-    const img = document.querySelector('.hero-img');
-    if (img) showLayer(`<div class="scrim"></div><button class="viewer" data-act="close" aria-label="关闭大图"><img src="${esc(img.getAttribute('src'))}" alt=""></button>`);
+  photo: el => {
+    const m = state.meds.get(el.dataset.id);
+    if (m) openViewer(photosOf(m), Number(el.dataset.i));
+  },
+  'v-step': el => {
+    const n = viewer.photos.length;
+    viewer.i = (viewer.i + Number(el.dataset.v) + n) % n;
+    renderViewer();
+  },
+  'crop-zoom': el => cropZoom(Number(el.dataset.v)),
+  'crop-done': cropDone,
+  'close-crop': () => { cropper = null; closeLayer(); },
+  'photo-menu': el => openPhotoMenu(Number(el.dataset.i)),
+  'ph-edit': el => {
+    const i = Number(el.dataset.i);
+    openCropper(form.photos[i], data => { form.photos[i] = data; render(); });
+  },
+  'ph-cover': el => {
+    const i = Number(el.dataset.i);
+    form.photos.unshift(form.photos.splice(i, 1)[0]);
+    closeLayer();
+    render();
+  },
+  'ph-replace': el => {
+    photoPending = { mode: 'replace', i: Number(el.dataset.i) };
+    closeLayer();
+    document.getElementById('photo-in').click();
+  },
+  'ph-del': el => {
+    form.photos.splice(Number(el.dataset.i), 1);
+    closeLayer();
+    render();
   },
   stock: el => openStock(el.dataset.id),
   mode: el => { sheet.mode = el.dataset.v; sheet.n = 1; renderSheet(); },
@@ -994,14 +1230,23 @@ const actions = {
   cal: el => {
     const m = state.meds.get(el.dataset.id);
     if (m) addToCalendar(m, el.dataset.exp);
-    if (el.closest('.sheet')) closeLayer();
+    if (el.closest('.sheet') && !el.dataset.keep) closeLayer();
   },
-  'pick-photo': () => document.getElementById('photo-in').click(),
+  'f-row-add': () => { form.rows.push({ exp: '', qty: 1 }); render(); },
+  'f-row-del': el => { form.rows.splice(Number(el.dataset.i), 1); render(); },
+  'pick-photo': () => {
+    photoPending = { mode: 'add' };
+    document.getElementById('photo-in').click();
+  },
   'rm-tag': el => { form.tags = form.tags.filter(t => t !== el.dataset.v); render(); },
   'add-tag': el => { if (!form.tags.includes(el.dataset.v)) form.tags.push(el.dataset.v); render(); },
   'f-box': el => { form.box = el.dataset.v; render(); },
   'f-remind': el => { form.remindDays = Number(el.dataset.v); render(); },
-  'f-qty': el => { form.qty = Math.max(1, form.qty + Number(el.dataset.v)); render(); },
+  'f-qty': el => {
+    const r = form.rows[Number(el.dataset.i)];
+    r.qty = Math.max(1, r.qty + Number(el.dataset.v));
+    render();
+  },
   'save-form': saveForm,
   'del-med': delMed,
   login: () => doAuth('login'),
@@ -1022,9 +1267,15 @@ document.addEventListener('input', e => {
   const t = e.target;
   if (t.id === 'q') { state.search = t.value; render(); return; }
   if (t.dataset.in && sheet) { sheet[t.dataset.in] = t.value; return; }
+  if (t.dataset.fr && form) {
+    form.rows[Number(t.dataset.i)][t.dataset.fr] = t.value;
+    const h = document.getElementById('remind-hint');
+    if (h) h.textContent = remindHint();
+    return;
+  }
   if (t.dataset.f && form) {
     form[t.dataset.f] = t.value;
-    if (t.dataset.f === 'exp') { const h = document.getElementById('remind-hint'); if (h) h.textContent = remindHint(); }
+    if (t.tagName === 'TEXTAREA') grow(t);
     return;
   }
   if (t.id === 'tag-in' && form) {
@@ -1042,8 +1293,17 @@ document.addEventListener('keydown', e => {
 document.addEventListener('change', async e => {
   const t = e.target;
   if (t.id === 'photo-in' && t.files && t.files[0]) {
-    try { form.photo = await compressImage(t.files[0]); render(); }
-    catch (err) { toast('照片读取失败，换一张试试'); }
+    const reader = new FileReader();
+    const pending = photoPending || { mode: 'add' };
+    reader.onload = () => openCropper(reader.result, data => {
+      if (!form) return;
+      if (pending.mode === 'replace') form.photos[pending.i] = data;
+      else if (form.photos.length < MAX_PHOTOS) form.photos.push(data);
+      photoPending = null;
+      render();
+    });
+    reader.onerror = () => toast('照片读取失败，换一张试试');
+    reader.readAsDataURL(t.files[0]);
     t.value = '';
   } else if (t.id === 'import-in' && t.files && t.files[0]) {
     await importData(t.files[0]);
