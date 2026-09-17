@@ -252,7 +252,7 @@ button.tag{height:34px;padding:0 12px;font-size:14px;border-radius:10px;display:
 .yr-row{display:flex;align-items:center;gap:6px}
 .yr-m{width:18px;flex-shrink:0;border:0;background:none;padding:0;text-align:right;font-family:"Barlow Condensed","DIN Condensed",sans-serif;font-size:13px;font-weight:600;color:var(--muted)}
 .yr-days{flex:1;display:grid;grid-template-columns:repeat(31,minmax(0,1fr));gap:2px}
-.hc{width:100%;aspect-ratio:1;border:0;padding:0;border-radius:2px;background:var(--bg)}
+.hc{width:100%;height:14px;border:0;padding:0;border-radius:3px;background:var(--bg)}
 .hc.empty{background:transparent}
 .hc.now{box-shadow:inset 0 0 0 1.5px var(--accent)}
 .hc.on{box-shadow:inset 0 0 0 2px var(--ink)}
@@ -263,6 +263,10 @@ button.tag{height:34px;padding:0 12px;font-size:14px;border-radius:10px;display:
 .cal-cell .num{font-family:"Barlow Condensed","DIN Condensed",sans-serif;font-size:17px;font-weight:600}
 .cal-cell .dots{display:flex;gap:3px;height:6px}
 .cal-cell .dots i{width:6px;height:6px;border-radius:3px;display:block}
+.cal-cell .dots i.soft{opacity:.35}
+.cal-tip{margin:8px 4px 0;font-size:12px;color:var(--muted);text-align:center}
+.seg.tiny button{height:32px;padding:0 12px;font-size:14px;font-weight:500}
+.healed{margin-left:8px;font-size:12px;font-weight:500;color:var(--accent);background:var(--accent-soft);padding:1px 8px;border-radius:999px}
 .cal-cell.today .num{color:var(--accent)}
 .cal-cell.on{background:var(--accent-soft)}
 .logs{display:flex;flex-direction:column;gap:10px}
@@ -322,11 +326,11 @@ const FIREBASE_CONFIG = {
 };
 /* ============================================ */
 
-const BOXES = { human: '人用药', cat: '猫用药' };
+const BOXES = { cat: '猫用药', human: '人用药' };
 const REMIND_OPTIONS = [30, 60, 120];
 const LOG_TEXT = { add: '添加', in: '入库', use: '用完', open: '开封' };
 const FB_VER = '10.12.2';
-const APP_VER = '2026.09.17-18';
+const APP_VER = '2026.09.17-21';
 const MAX_PHOTOS = 6;
 const PHOTO_PX = 640;
 const PHOTO_Q = 0.62;
@@ -1108,11 +1112,11 @@ function renderViewer() {
     </div>`);
 }
 
-function openCropper(src, onDone) {
+function openCropper(src, onDone, onClose) {
   const img = new Image();
   img.onload = () => {
     const V = Math.min(320, Math.round(window.innerWidth * 0.78));
-    cropper = { img, V, base: V / Math.min(img.naturalWidth, img.naturalHeight), s: 1, ox: 0, oy: 0, onDone };
+    cropper = { img, V, base: V / Math.min(img.naturalWidth, img.naturalHeight), s: 1, ox: 0, oy: 0, onDone, onClose };
     renderCropper();
   };
   img.onerror = () => toast('照片读取失败，换一张试试');
@@ -1205,6 +1209,7 @@ function cropDone() {
   ctx.drawImage(c.img, cx - half, cy - half, half * 2, half * 2, 0, 0, PHOTO_PX, PHOTO_PX);
   const data = canvas.toDataURL('image/jpeg', PHOTO_Q);
   const done = c.onDone;
+  if (c.onClose) c.onClose();
   cropper = null;
   closeLayer();
   done(data);
@@ -1312,7 +1317,7 @@ async function importData(file) {
 }
 
 /* ---------- 成员与生病记录 ---------- */
-const KINDS = { human: '人', cat: '猫' };
+const KINDS = { cat: '猫', human: '人' };
 const SYM_COLORS = ['#A85E2B', '#5B4A82', '#2B6A85', '#2E6A4C', '#8A4F00', '#A8261C'];
 const SEC_TYPES = { multi: '多选', single: '单选', number: '数字', text: '文字' };
 const WEEK = ['日', '一', '二', '三', '四', '五', '六'];
@@ -1326,7 +1331,7 @@ const activeSymId = () => (lf ? lf.symptomId : tpl);
 const membersOf = k => [...state.members.values()].filter(m => m.kind === k)
   .sort((a, b) => a.name.localeCompare(b.name, 'zh'));
 const logsOf = id => [...state.logs.values()].filter(l => l.memberId === id)
-  .sort((a, b) => b.date.localeCompare(a.date));
+  .sort((a, b) => a.date.localeCompare(b.date));
 const symOf = id => state.symptoms.get(id);
 const symName = id => (symOf(id) || {}).name || '未分类';
 const symColor = id => (symOf(id) || {}).color || '#5A635E';
@@ -1407,7 +1412,8 @@ function viewHealth(kind) {
   if (!KINDS[kind]) return notFound();
   const ms = membersOf(kind);
   const rows = ms.map(m => {
-    const last = logsOf(m.id)[0];
+    const ls = logsOf(m.id);
+    const last = ls[ls.length - 1];
     return `<a class="mem" href="#/member/${m.id}">
       ${avatarHtml(m, 'avatar')}
       <div class="mem-b">
@@ -1517,6 +1523,28 @@ function calRange(anchor, view) {
   const y = d.getFullYear(), m = d.getMonth() + 1;
   return { from: `${y}-${pad2(m)}-01`, to: `${y}-${pad2(m)}-${pad2(new Date(y, m, 0).getDate())}`, label: `${y} 年 ${m} 月` };
 }
+function carryByDate(id, filter, from, to) {
+  const out = {};
+  const bySym = {};
+  [...state.logs.values()].filter(l => l.memberId === id && (!filter || l.symptomId === filter))
+    .forEach(l => { (bySym[l.symptomId] = bySym[l.symptomId] || []).push(l); });
+  Object.entries(bySym).forEach(([sid, arr]) => {
+    const sy = symOf(sid);
+    if (sy && sy.healTrack === false) return;
+    arr.sort((a, b) => a.date.localeCompare(b.date));
+    arr.forEach((l, i) => {
+      if (l.healed) return;
+      const next = arr[i + 1];
+      const stop = next ? next.date : addDays(todayStr(), 1);
+      let d = addDays(l.date, 1), guard = 0;
+      while (d < stop && guard++ < 60) {
+        if (d >= from && d <= to) (out[d] = out[d] || []).push(sid);
+        d = addDays(d, 1);
+      }
+    });
+  });
+  return out;
+}
 function dotsByDate(id, filter, from, to) {
   const by = {};
   [...state.logs.values()]
@@ -1524,15 +1552,19 @@ function dotsByDate(id, filter, from, to) {
     .forEach(l => { (by[l.date] = by[l.date] || []).push(l.symptomId); });
   return by;
 }
-function dayCell(date, n, syms) {
+function dayCell(date, n, syms, soft) {
   const cls = 'cal-cell day' + (state.calDay === date ? ' on' : '') + (date === todayStr() ? ' today' : '');
+  const dots = syms.slice(0, 3).map(sid => `<i style="background:${symColor(sid)}"></i>`).join('') +
+    (soft || []).filter(sid => !syms.includes(sid)).slice(0, 3)
+      .map(sid => `<i class="soft" style="background:${symColor(sid)}"></i>`).join('');
   return `<button class="${cls}" data-act="cal-day" data-v="${date}">
     <span class="num">${n}</span>
-    <span class="dots">${syms.slice(0, 3).map(sid => `<i style="background:${symColor(sid)}"></i>`).join('')}</span></button>`;
+    <span class="dots">${dots}</span></button>`;
 }
 function calHtml(id, anchor, view, filter) {
   const r = calRange(anchor, view);
   const by = dotsByDate(id, filter, r.from, r.to);
+  const soft = carryByDate(id, filter, r.from, r.to);
   let grid = '';
   if (view === 'month') {
     const d = parseYmd(anchor);
@@ -1543,7 +1575,7 @@ function calHtml(id, anchor, view, filter) {
     for (let i = 0; i < pad; i++) grid += '<span class="cal-cell"></span>';
     for (let n = 1; n <= total; n++) {
       const date = `${y}-${pad2(m)}-${pad2(n)}`;
-      grid += dayCell(date, n, [...new Set(by[date] || [])]);
+      grid += dayCell(date, n, [...new Set(by[date] || [])], [...new Set(soft[date] || [])]);
     }
     grid += '</div>';
   } else if (view === 'week') {
@@ -1553,7 +1585,7 @@ function calHtml(id, anchor, view, filter) {
       const d = new Date(start);
       d.setDate(start.getDate() + i);
       const date = ymd(d);
-      grid += `<div class="wk-col"><span class="cal-w">${WEEK[i]}</span>${dayCell(date, d.getDate(), [...new Set(by[date] || [])])}</div>`;
+      grid += `<div class="wk-col"><span class="cal-w">${WEEK[i]}</span>${dayCell(date, d.getDate(), [...new Set(by[date] || [])], [...new Set(soft[date] || [])])}</div>`;
     }
     grid += '</div>';
   } else {
@@ -1566,7 +1598,9 @@ function calHtml(id, anchor, view, filter) {
         if (d > total) { cells += '<span class="hc empty"></span>'; continue; }
         const date = `${y}-${pad2(m)}-${pad2(d)}`;
         const syms = [...new Set(by[date] || [])];
-        cells += `<button class="hc${state.calDay === date ? ' on' : ''}${date === todayStr() ? ' now' : ''}" data-act="cal-day" data-v="${date}" aria-label="${m} 月 ${d} 日"${syms.length ? ` style="background:${symColor(syms[0])}"` : ''}></button>`;
+        const sf = [...new Set(soft[date] || [])];
+        const bg = syms.length ? `background:${symColor(syms[0])}` : (sf.length ? `background:${symColor(sf[0])};opacity:.35` : '');
+        cells += `<button class="hc${state.calDay === date ? ' on' : ''}${date === todayStr() ? ' now' : ''}" data-act="cal-day" data-v="${date}" aria-label="${m} 月 ${d} 日"${bg ? ` style="${bg}"` : ''}></button>`;
       }
       rows += `<div class="yr-row"><button class="yr-m" data-act="cal-month" data-v="${y}-${pad2(m)}-01">${m}</button><div class="yr-days">${cells}</div></div>`;
     }
@@ -1582,6 +1616,7 @@ function calHtml(id, anchor, view, filter) {
       <div class="cal-seg">${seg}</div>
     </div>
     ${grid}
+    <p class="cal-tip">浅色的点表示这几天还没好，只是没单独记录</p>
   </div>`;
 }
 function logRow(l) {
@@ -1589,7 +1624,7 @@ function logRow(l) {
   return `<a class="log-row" href="#/log/${l.id}">
     <i class="dot" style="background:${symColor(l.symptomId)}"></i>
     <div class="log-b">
-      <b>${dot(l.date).slice(5)} ${esc(symName(l.symptomId))}</b>
+      <b>${dot(l.date).slice(5)} ${esc(symName(l.symptomId))}${l.healed ? '<span class="healed">好了</span>' : ''}</b>
       ${sum ? `<span class="row-s">${esc(sum)}</span>` : ''}
       ${l.note ? `<span class="row-s">${esc(l.note)}</span>` : ''}
     </div>
@@ -1696,7 +1731,14 @@ function viewSymptom(id) {
         <div class="line"><span>颜色</span>
           <div class="colors">${SYM_COLORS.map(c => `<button class="swatch${c === sy.color ? ' on' : ''}" style="background:${c}" data-act="sym-color" data-id="${id}" data-v="${encodeURIComponent(c)}" aria-label="换颜色"></button>`).join('')}</div>
         </div>
+        <div class="line"><span>记痊愈状态</span>
+          <div class="seg tiny">
+            <button data-act="sym-heal" data-id="${id}" data-v="1" class="${sy.healTrack === false ? '' : 'on'}">要</button>
+            <button data-act="sym-heal" data-id="${id}" data-v="0" class="${sy.healTrack === false ? 'on' : ''}">不要</button>
+          </div>
+        </div>
       </div>
+      <p class="hint">像角膜溃疡这种会拖好几天的，开着；记了「未痊愈」之后，中间没记录的日子日历上会显示浅色的点。像呕吐这种当天记当天的，可以关掉。</p>
       <p class="hint">下面就是记录这个症状时会看到的样子</p>
       ${sectionsHtml(sy, null)}
       <button class="btn wide addbtn" data-act="sec-add">${svg(P.plus, 20, 2.2)}加一个板块</button>
@@ -1710,12 +1752,13 @@ function viewLog(mode, arg) {
     if (mode === 'new') {
       if (!state.members.get(arg)) return notFound();
       const first = [...state.symptoms.values()][0];
-      lf = { key, memberId: arg, symptomId: first ? first.id : '', date: state.calDay || todayStr(), values: {}, photos: [], note: '' };
+      lf = { key, memberId: arg, symptomId: first ? first.id : '', date: state.calDay || todayStr(), values: {}, photos: [], note: '', healed: false };
     } else {
       const l = state.logs.get(arg);
       if (!l) return notFound();
       lf = { key, id: l.id, memberId: l.memberId, symptomId: l.symptomId, date: l.date,
-        values: clone(l.values || {}), photos: (l.photos || []).slice(), note: l.note || '', createdAt: l.createdAt };
+        values: clone(l.values || {}), photos: (l.photos || []).slice(), note: l.note || '',
+        healed: !!l.healed, createdAt: l.createdAt };
     }
   }
   const me = state.members.get(lf.memberId);
@@ -1743,6 +1786,12 @@ function viewLog(mode, arg) {
       <input type="file" id="lphoto-in" accept="image/*" hidden>
       <div class="card">
         <label class="line"><span>日期</span><input data-lf="date" type="date" value="${lf.date}"></label>
+        ${sym && sym.healTrack !== false ? `<div class="line"><span>痊愈了吗</span>
+          <div class="seg tiny">
+            <button data-act="lf-healed" data-v="0" class="${lf.healed ? '' : 'on'}">未痊愈</button>
+            <button data-act="lf-healed" data-v="1" class="${lf.healed ? 'on' : ''}">已痊愈</button>
+          </div>
+        </div>` : ''}
       </div>
       ${ep && ep.day > 1 ? `<p class="hint">这次发作从 ${dot(ep.from)} 开始，这是第 ${ep.day} 天</p>` : ''}
       <div class="field-l">症状</div>
@@ -1762,7 +1811,7 @@ function saveLog() {
   const l = {
     id: lf.id || uid(), memberId: lf.memberId, symptomId: lf.symptomId,
     date: lf.date || todayStr(), values: lf.values, photos: lf.photos,
-    note: lf.note.trim(), createdAt: lf.createdAt || todayStr()
+    note: lf.note.trim(), healed: !!lf.healed, createdAt: lf.createdAt || todayStr()
   };
   if (tooBig(l)) return;
   const to = '#/member/' + l.memberId;
@@ -1877,6 +1926,7 @@ function render() {
   renderView();
   $app.querySelectorAll('textarea').forEach(grow);
   window.scrollTo(0, y);
+  requestAnimationFrame(() => window.scrollTo(0, y));
   if (fid) {
     const el = document.getElementById(fid);
     if (el) {
@@ -1907,7 +1957,7 @@ const actions = {
   },
   'crop-zoom': el => cropZoom(Number(el.dataset.v)),
   'crop-done': cropDone,
-  'close-crop': () => { cropper = null; closeLayer(); },
+  'close-crop': () => { if (cropper && cropper.onClose) cropper.onClose(); cropper = null; closeLayer(); },
   'photo-menu': el => openPhotoMenu(Number(el.dataset.i)),
   'ph-edit': el => {
     const i = Number(el.dataset.i);
@@ -2039,6 +2089,11 @@ const actions = {
     sy.color = decodeURIComponent(el.dataset.v);
     saveDoc('symptoms', sy);
   },
+  'sym-heal': el => {
+    const sy = clone(state.symptoms.get(el.dataset.id));
+    sy.healTrack = el.dataset.v === '1';
+    saveDoc('symptoms', sy);
+  },
   'sym-del': el => {
     const sy = state.symptoms.get(el.dataset.id);
     const logs = [...state.logs.values()].filter(l => l.symptomId === sy.id);
@@ -2097,6 +2152,7 @@ const actions = {
     saveDoc('symptoms', sym);
     closeLayer();
   },
+  'lf-healed': el => { lf.healed = el.dataset.v === '1'; render(); },
   'save-log': saveLog,
   'del-log': delLog,
   'close-ask': () => { ask = null; closeLayer(); },
@@ -2172,9 +2228,9 @@ document.addEventListener('keydown', e => {
 document.addEventListener('change', async e => {
   const t = e.target;
   if ((t.id === 'photo-in' || t.id === 'mphoto-in' || t.id === 'lphoto-in') && t.files && t.files[0]) {
-    const reader = new FileReader();
+    const url = URL.createObjectURL(t.files[0]);
     const pending = photoPending || { mode: 'add' };
-    reader.onload = () => openCropper(reader.result, data => {
+    const done = data => {
       photoPending = null;
       if (pending.target === 'member') { if (mform) { mform.photo = data; render(); } return; }
       if (pending.target === 'log') {
@@ -2188,9 +2244,8 @@ document.addEventListener('change', async e => {
       if (pending.mode === 'replace') form.photos[pending.i] = data;
       else if (form.photos.length < MAX_PHOTOS) form.photos.push(data);
       render();
-    });
-    reader.onerror = () => toast('照片读取失败，换一张试试');
-    reader.readAsDataURL(t.files[0]);
+    };
+    openCropper(url, done, () => URL.revokeObjectURL(url));
     t.value = '';
   } else if (t.id === 'import-in' && t.files && t.files[0]) {
     await importData(t.files[0]);
