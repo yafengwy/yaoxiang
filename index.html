@@ -47,8 +47,8 @@ button:disabled{opacity:.4;cursor:default}
 .icon-btn.small{width:32px;height:32px;flex-shrink:0;color:var(--muted)}
 .accent-t{color:var(--accent)}
 .sym-dot{width:18px;height:18px;border-radius:9px;flex-shrink:0}
-.colors{display:flex;gap:8px}
-.swatch{width:30px;height:30px;border-radius:15px;border:2px solid transparent;padding:0}
+.colors{display:flex;gap:7px;flex-wrap:wrap;justify-content:flex-end}
+.swatch{width:28px;height:28px;border-radius:14px;border:2px solid transparent;padding:0}
 .swatch.on{border-color:var(--ink)}
 .opt-chip:disabled{opacity:1}
 .icon-btn{width:44px;height:44px;display:inline-flex;align-items:center;justify-content:center;border:0;background:none;color:var(--ink);border-radius:12px;padding:0}
@@ -330,7 +330,7 @@ const BOXES = { cat: '猫用药', human: '人用药' };
 const REMIND_OPTIONS = [30, 60, 120];
 const LOG_TEXT = { add: '添加', in: '入库', use: '用完', open: '开封' };
 const FB_VER = '10.12.2';
-const APP_VER = '2026.09.17-21';
+const APP_VER = '2026.09.17-23';
 const MAX_PHOTOS = 6;
 const PHOTO_PX = 640;
 const PHOTO_Q = 0.62;
@@ -987,10 +987,6 @@ function viewForm(mode, arg) {
       </div>
       ${suggest.length ? `<div class="quick">${suggest.map(t => `<button class="tag" data-act="add-tag" data-v="${esc(t)}">+ #${esc(t)}</button>`).join('')}</div>` : ''}
 
-      <div class="field-l">放进哪个药箱</div>
-      <div class="seg2">${Object.entries(BOXES).map(([k, l]) =>
-        `<button data-act="f-box" data-v="${k}" class="${f.box === k ? 'on' : ''}">${l}</button>`).join('')}</div>
-
       ${f.rows.map((r, i) => `<div class="card">
         ${mode === 'edit' || i > 0 ? `<div class="line"><span>第 ${i + 1} 批</span>
           <button class="link-btn" style="color:var(--bad)" data-act="f-row-del" data-i="${i}">删除</button></div>` : ''}
@@ -1318,7 +1314,7 @@ async function importData(file) {
 
 /* ---------- 成员与生病记录 ---------- */
 const KINDS = { cat: '猫', human: '人' };
-const SYM_COLORS = ['#A85E2B', '#5B4A82', '#2B6A85', '#2E6A4C', '#8A4F00', '#A8261C'];
+const SYM_COLORS = ['#C2582B', '#7A4FB5', '#2F77B8', '#3F8C33', '#C43F7B', '#0E8C80', '#B3261E'];
 const SEC_TYPES = { multi: '多选', single: '单选', number: '数字', text: '文字' };
 const WEEK = ['日', '一', '二', '三', '四', '五', '六'];
 
@@ -2005,7 +2001,6 @@ const actions = {
   },
   'rm-tag': el => { form.tags = form.tags.filter(t => t !== el.dataset.v); render(); },
   'add-tag': el => { if (!form.tags.includes(el.dataset.v)) form.tags.push(el.dataset.v); render(); },
-  'f-box': el => { form.box = el.dataset.v; render(); },
   'f-remind': el => { form.remindDays = Number(el.dataset.v); render(); },
   'f-qty': el => {
     const r = form.rows[Number(el.dataset.i)];
