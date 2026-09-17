@@ -237,7 +237,7 @@ button.tag{height:34px;padding:0 12px;font-size:14px;border-radius:10px;display:
 .mem-note{margin:0 20px 10px;font-size:14px;color:var(--muted);white-space:pre-wrap}
 .avatar{width:64px;height:64px;border-radius:32px;object-fit:cover;flex-shrink:0}
 .avatar.big{width:84px;height:84px;border-radius:42px}
-.addbtn{display:flex;align-items:center;justify-content:center;gap:8px;color:var(--accent)}
+.btn.addbtn{display:flex;align-items:center;justify-content:center;gap:8px;color:var(--accent)}
 .cal{background:var(--card);border-radius:20px;padding:12px 10px 10px;margin-top:4px}
 .cal-h{display:flex;align-items:center;gap:4px;padding:0 4px 8px}
 .cal-h b{flex:1;text-align:center}
@@ -248,12 +248,14 @@ button.tag{height:34px;padding:0 12px;font-size:14px;border-radius:10px;display:
 .wk-col{display:flex;flex-direction:column;align-items:center;gap:2px}
 .wk-col .cal-cell{height:58px;width:100%}
 .wk-col .cal-cell .num{font-size:20px}
-.cal-year{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
-.yr-cell{height:58px;border:0;border-radius:14px;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;color:var(--muted)}
-.yr-cell.has{background:var(--accent-soft);color:var(--ink)}
-.yr-cell .num{font-family:"Barlow Condensed","DIN Condensed",sans-serif;font-size:19px;font-weight:600}
-.yr-cell .dots{display:flex;gap:3px;height:6px}
-.yr-cell .dots i{width:6px;height:6px;border-radius:3px;display:block}
+.yr-heat{display:flex;flex-direction:column;gap:3px;padding:4px 2px 2px}
+.yr-row{display:flex;align-items:center;gap:6px}
+.yr-m{width:18px;flex-shrink:0;border:0;background:none;padding:0;text-align:right;font-family:"Barlow Condensed","DIN Condensed",sans-serif;font-size:13px;font-weight:600;color:var(--muted)}
+.yr-days{flex:1;display:grid;grid-template-columns:repeat(31,minmax(0,1fr));gap:2px}
+.hc{width:100%;aspect-ratio:1;border:0;padding:0;border-radius:2px;background:var(--bg)}
+.hc.empty{background:transparent}
+.hc.now{box-shadow:inset 0 0 0 1.5px var(--accent)}
+.hc.on{box-shadow:inset 0 0 0 2px var(--ink)}
 .cal-h b{font-size:17px}
 .cal-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:2px}
 .cal-w{text-align:center;font-size:12px;color:var(--muted);padding-bottom:4px}
@@ -324,7 +326,7 @@ const BOXES = { human: '人用药', cat: '猫用药' };
 const REMIND_OPTIONS = [30, 60, 120];
 const LOG_TEXT = { add: '添加', in: '入库', use: '用完', open: '开封' };
 const FB_VER = '10.12.2';
-const APP_VER = '2026.09.17-16';
+const APP_VER = '2026.09.17-18';
 const MAX_PHOTOS = 6;
 const PHOTO_PX = 640;
 const PHOTO_Q = 0.62;
@@ -1246,7 +1248,6 @@ function viewLogin() {
       <label class="line"><span>密码</span><input id="pw" type="password" autocomplete="current-password" placeholder="至少 6 位"></label>
     </div>
     <button class="btn primary wide" data-act="login">登录</button>
-    <button class="btn wide" data-act="signup">第一次用，注册</button>
     <button class="text-btn" data-act="reset">忘记密码</button>
   </main>`;
 }
@@ -1331,6 +1332,12 @@ const symName = id => (symOf(id) || {}).name || '未分类';
 const symColor = id => (symOf(id) || {}).color || '#5A635E';
 const medNames = () => [...new Set([...state.meds.values()].map(m => m.name))];
 
+function weightText(w) {
+  const n = parseFloat(String(w).replace(/[^\d.]/g, ''));
+  if (!n) return esc(w);
+  const kg = Math.round(n * 0.45359237 * 10) / 10;
+  return `${n} lb / ${kg} kg`;
+}
 function ageText(birth) {
   if (!birth) return '';
   const b = parseYmd(birth), n = new Date();
@@ -1447,7 +1454,7 @@ function viewMemberForm(mode, arg) {
       <div class="card">
         <label class="line"><span>名字</span><input id="mf-name" data-mf="name" type="text" placeholder="比如 胖胖" value="${esc(f.name)}"></label>
         <label class="line"><span>出生日期</span><input data-mf="birth" type="date" value="${f.birth}"></label>
-        <label class="line"><span>体重</span><input id="mf-weight" data-mf="weight" type="text" placeholder="比如 4.2kg" value="${esc(f.weight)}"></label>
+        <label class="line"><span>体重（lb）</span><input id="mf-weight" data-mf="weight" type="text" inputmode="decimal" placeholder="比如 9.5" value="${esc(f.weight)}"></label>
         <label class="line"><span>芯片号</span><input id="mf-chip" data-mf="chip" type="text" placeholder="microchip number" value="${esc(f.chip)}"></label>
         ${f.fields.map((x, i) => `<label class="line"><span>${esc(x.label)}</span>
           <input id="mf-fx-${i}" data-mfx="${i}" type="text" placeholder="写点什么" value="${esc(x.value)}">
@@ -1551,16 +1558,19 @@ function calHtml(id, anchor, view, filter) {
     grid += '</div>';
   } else {
     const y = parseYmd(anchor).getFullYear();
-    grid = '<div class="cal-year">';
+    let rows = '';
     for (let m = 1; m <= 12; m++) {
-      const pre = `${y}-${pad2(m)}`;
-      const syms = [...new Set(Object.keys(by).filter(d => d.startsWith(pre)).flatMap(d => by[d]))];
-      const cnt = Object.keys(by).filter(d => d.startsWith(pre)).length;
-      grid += `<button class="yr-cell${cnt ? ' has' : ''}" data-act="cal-month" data-v="${pre}-01">
-        <span class="num">${m}</span>
-        <span class="dots">${syms.slice(0, 4).map(sid => `<i style="background:${symColor(sid)}"></i>`).join('')}</span></button>`;
+      const total = new Date(y, m, 0).getDate();
+      let cells = '';
+      for (let d = 1; d <= 31; d++) {
+        if (d > total) { cells += '<span class="hc empty"></span>'; continue; }
+        const date = `${y}-${pad2(m)}-${pad2(d)}`;
+        const syms = [...new Set(by[date] || [])];
+        cells += `<button class="hc${state.calDay === date ? ' on' : ''}${date === todayStr() ? ' now' : ''}" data-act="cal-day" data-v="${date}" aria-label="${m} 月 ${d} 日"${syms.length ? ` style="background:${symColor(syms[0])}"` : ''}></button>`;
+      }
+      rows += `<div class="yr-row"><button class="yr-m" data-act="cal-month" data-v="${y}-${pad2(m)}-01">${m}</button><div class="yr-days">${cells}</div></div>`;
     }
-    grid += '</div>';
+    grid = `<div class="yr-heat">${rows}</div>`;
   }
   const seg = ['year', 'month', 'week'].map(v =>
     `<button class="${state.calView === v ? 'on' : ''}" data-act="cal-view" data-v="${v}">${v === 'year' ? '年' : v === 'month' ? '月' : '周'}</button>`).join('');
@@ -1609,7 +1619,7 @@ function viewMember(id) {
       ${avatarHtml(me, 'avatar big')}
       <div class="hero-b">
         ${me.birth ? `<p style="font-size:17px;color:var(--ink)">${ageText(me.birth)}</p>` : ''}
-        ${me.weight ? `<p style="font-size:14px">体重 ${esc(me.weight)}</p>` : ''}
+        ${me.weight ? `<p style="font-size:14px">体重 ${weightText(me.weight)}</p>` : ''}
         ${me.chip ? `<p style="font-size:13px">芯片 ${esc(me.chip)}</p>` : ''}
         ${(me.fields || []).filter(x => x.value).map(x => `<p style="font-size:13px">${esc(x.label)} ${esc(x.value)}</p>`).join('')}
       </div>
@@ -1618,10 +1628,12 @@ function viewMember(id) {
     ${chips}
     <main class="pad" style="padding-top:4px;padding-bottom:120px">
       ${calHtml(id, anchor, state.calView, filter)}
-      <div class="sec-row"><h2 class="sec">${listTitle}</h2>
-        ${state.calDay ? '<button class="link-btn" data-act="cal-day" data-v="">看整个月</button>' : ''}</div>
-      ${shown.length ? `<div class="logs">${shown.map(logRow).join('')}</div>`
-        : '<p class="empty">这段时间没有记录</p>'}
+      ${(state.calView === 'year' && !state.calDay)
+        ? '<p class="hint" style="text-align:center">点某一天，看那天的记录；点左边的月份数字，切到那个月</p>'
+        : `<div class="sec-row"><h2 class="sec">${listTitle}</h2>
+            ${state.calDay ? '<button class="link-btn" data-act="cal-day" data-v="">看整段</button>' : ''}</div>
+          ${shown.length ? `<div class="logs">${shown.map(logRow).join('')}</div>`
+            : '<p class="empty">这段时间没有记录</p>'}`}
     </main>
     <a class="fab" href="#/log/new/${id}" aria-label="添加记录">${svg(P.plus, 28, 2.2)}</a>`;
 }
@@ -2098,7 +2110,6 @@ const actions = {
   'save-form': saveForm,
   'del-med': delMed,
   login: () => doAuth('login'),
-  signup: () => doAuth('signup'),
   reset: () => doAuth('reset'),
   logout: () => { if (confirm('退出登录？')) store.logout(); },
   export: exportData,
