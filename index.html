@@ -6,12 +6,12 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="药箱">
+<meta name="apple-mobile-web-app-title" content="健康管理">
 <meta name="theme-color" content="#EEF1EC">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" href="icon-192.png">
-<title>家庭药箱</title>
+<title>健康管理</title>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -220,6 +220,48 @@ button.tag{height:34px;padding:0 12px;font-size:14px;border-radius:10px;display:
 .menu-sheet button{width:100%;min-height:54px;border:0;border-bottom:1px solid var(--line);background:none;font-size:17px;text-align:left;padding:0}
 .menu-sheet button:last-child{border-bottom:0;color:var(--muted)}
 .menu-sheet .danger{color:var(--bad)}
+.tile-ic.alt{background:#E5E1EE;color:#5B4A82}
+.mems{display:flex;flex-direction:column;gap:12px;margin-bottom:14px}
+.mem{display:flex;align-items:center;gap:16px;padding:14px 16px;background:var(--card);border-radius:22px;color:var(--ink)}
+.mem-b{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.mem-b b{font-size:19px}
+.mem-b small{font-size:13px;color:var(--muted)}
+.mem-note{margin:0 20px 10px;font-size:14px;color:var(--muted);white-space:pre-wrap}
+.avatar{width:64px;height:64px;border-radius:32px;object-fit:cover;flex-shrink:0}
+.avatar.big{width:84px;height:84px;border-radius:42px}
+.addbtn{display:flex;align-items:center;justify-content:center;gap:8px;color:var(--accent)}
+.cal{background:var(--card);border-radius:20px;padding:12px 10px 10px;margin-top:4px}
+.cal-h{display:flex;align-items:center;justify-content:space-between;padding:0 4px 6px}
+.cal-h b{font-size:17px}
+.cal-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:2px}
+.cal-w{text-align:center;font-size:12px;color:var(--muted);padding-bottom:4px}
+.cal-cell{height:46px;border:0;background:none;padding:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;border-radius:12px;color:var(--ink)}
+.cal-cell .num{font-family:"Barlow Condensed","DIN Condensed",sans-serif;font-size:17px;font-weight:600}
+.cal-cell .dots{display:flex;gap:3px;height:6px}
+.cal-cell .dots i{width:6px;height:6px;border-radius:3px;display:block}
+.cal-cell.today .num{color:var(--accent)}
+.cal-cell.on{background:var(--accent-soft)}
+.logs{display:flex;flex-direction:column;gap:10px}
+.log-row{display:flex;gap:12px;align-items:flex-start;background:var(--card);border-radius:18px;padding:14px 16px;color:var(--ink)}
+.log-row .dot{width:8px;height:8px;border-radius:4px;margin-top:7px;flex-shrink:0}
+.log-b{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+.log-b b{font-size:16px}
+.log-th{width:52px;height:52px;border-radius:12px;object-fit:cover;flex-shrink:0}
+.pill .dot{width:8px;height:8px;border-radius:4px;margin-right:6px}
+.sec-block{margin-top:18px}
+.sec-head{display:flex;align-items:center;justify-content:space-between;margin:0 4px 8px}
+.sec-head span{font-size:14px;font-weight:500;color:var(--muted)}
+.sec-head .link-btn{min-height:28px;font-size:13px}
+.sec-input{width:100%;height:50px;border:0;border-radius:14px;background:var(--card);padding:0 16px;font-size:16px}
+.opt-chip{min-height:40px;padding:0 14px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--ink);font-size:15px;display:inline-flex;align-items:center;gap:6px}
+.opt-chip.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.opt-chip.add{border-style:dashed;color:var(--muted)}
+.stepper.start{justify-content:flex-start}
+.photo-thumb.round,.photo-add.round{border-radius:46px;width:92px;height:92px}
+.ask-in{width:100%;height:50px;border:1px solid var(--line);border-radius:14px;background:var(--card);padding:0 16px;font-size:16px;margin:6px 0 4px;color:var(--ink)}
+.menu-sheet button{display:flex;align-items:center;justify-content:space-between;gap:12px;text-align:left}
+.menu-sheet .muted{font-size:13px;color:var(--muted);font-weight:400}
+.menu-sheet .danger{color:var(--bad)}
 #pull{position:fixed;top:0;left:0;right:0;height:56px;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:14px;z-index:6;pointer-events:none;transform:translateY(-56px);transition:transform .2s ease-out;padding-top:env(safe-area-inset-top)}
 #pull.drag{transition:none}
 .login{padding-top:calc(env(safe-area-inset-top) + 60px)}
@@ -260,7 +302,7 @@ const BOXES = { human: '人用药', cat: '猫用药' };
 const REMIND_OPTIONS = [30, 60, 120];
 const LOG_TEXT = { add: '添加', in: '入库', use: '用完', open: '开封' };
 const FB_VER = '10.12.2';
-const APP_VER = '2026.09.17-11';
+const APP_VER = '2026.09.17-13';
 const MAX_PHOTOS = 6;
 const PHOTO_PX = 640;
 const PHOTO_Q = 0.62;
@@ -269,7 +311,12 @@ const $app = document.getElementById('app');
 const $layer = document.getElementById('layer');
 const $toast = document.getElementById('toast');
 
-const state = { meds: new Map(), ready: false, user: null, search: '', searchOpen: false, expiredOpen: false };
+const COLS = ['meds', 'members', 'symptoms', 'logs', 'lists'];
+const state = {
+  meds: new Map(), members: new Map(), symptoms: new Map(), logs: new Map(), lists: new Map(),
+  ready: false, user: null, search: '', searchOpen: false, expiredOpen: false,
+  cal: '', calDay: '', symFilter: ''
+};
 let store = null;
 let sheet = null;
 let form = null;
@@ -311,7 +358,8 @@ const P = {
   cat: '<path d="M5 3l3.5 5h7L19 3v10a7 7 0 0 1-14 0z"/><circle cx="9.5" cy="12.5" r=".6"/><circle cx="14.5" cy="12.5" r=".6"/><path d="M11.2 15.4h1.6L12 16.3z"/>',
   person: '<circle cx="12" cy="8" r="3.5"/><path d="M5 20c0-3.9 3.1-7 7-7s7 3.1 7 7"/>',
   bottle: '<rect x="7" y="8" width="10" height="13" rx="2"/><path d="M9 8V5h6v3M10 14h4"/>',
-  camera: '<path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/>'
+  camera: '<path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/>',
+  check: '<path d="M5 12l5 5 9-10"/>'
 };
 
 /* ---------- 药品计算 ---------- */
@@ -352,27 +400,32 @@ const LocalStore = {
   db: null,
   async init() {
     this.db = await new Promise((res, rej) => {
-      const r = indexedDB.open('yaoxiang', 1);
-      r.onupgradeneeded = () => r.result.createObjectStore('meds', { keyPath: 'id' });
+      const r = indexedDB.open('yaoxiang', 2);
+      r.onupgradeneeded = () => {
+        const db = r.result;
+        COLS.forEach(c => { if (!db.objectStoreNames.contains(c)) db.createObjectStore(c, { keyPath: 'id' }); });
+      };
       r.onsuccess = () => res(r.result);
       r.onerror = () => rej(r.error);
     });
     try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) { /* ignore */ }
-    const all = await this.tx('readonly', s => s.getAll());
-    (all || []).forEach(m => state.meds.set(m.id, m));
+    for (const c of COLS) {
+      const all = await this.tx(c, 'readonly', st => st.getAll());
+      (all || []).forEach(d => state[c].set(d.id, d));
+    }
     state.ready = true;
     render();
   },
-  tx(mode, fn) {
+  tx(col, mode, fn) {
     return new Promise((res, rej) => {
-      const t = this.db.transaction('meds', mode);
-      const req = fn(t.objectStore('meds'));
+      const t = this.db.transaction(col, mode);
+      const req = fn(t.objectStore(col));
       t.oncomplete = () => res(req && req.result);
       t.onerror = () => rej(t.error);
     });
   },
-  put(m) { return this.tx('readwrite', s => s.put(m)); },
-  del(id) { return this.tx('readwrite', s => s.delete(id)); }
+  put(col, d) { return this.tx(col, 'readwrite', st => st.put(d)); },
+  del(col, id) { return this.tx(col, 'readwrite', st => st.delete(id)); }
 };
 
 /* ---------- 存储：Firebase 云端 ---------- */
@@ -384,7 +437,7 @@ function loadScript(src) {
   });
 }
 const CloudStore = {
-  auth: null, fs: null, uid: null, unsub: null,
+  auth: null, fs: null, uid: null, unsubs: [],
   async init() {
     const base = `https://www.gstatic.com/firebasejs/${FB_VER}/`;
     await loadScript(base + 'firebase-app-compat.js');
@@ -395,34 +448,44 @@ const CloudStore = {
     this.fs = firebase.firestore();
     try { await this.fs.enablePersistence({ synchronizeTabs: true }); } catch (e) { /* 离线缓存不可用时照常运行 */ }
     this.auth.onAuthStateChanged(user => {
-      if (this.unsub) { this.unsub(); this.unsub = null; }
-      state.meds.clear();
+      this.unsubs.forEach(u => u());
+      this.unsubs = [];
+      COLS.forEach(c => state[c].clear());
       state.user = user;
       this.uid = user ? user.uid : null;
       if (!user) { state.ready = true; render(); return; }
       state.ready = false;
       render();
-      this.unsub = this.col().onSnapshot(snap => {
-        snap.docChanges().forEach(ch => {
-          if (ch.type === 'removed') state.meds.delete(ch.doc.id);
-          else state.meds.set(ch.doc.id, ch.doc.data());
-        });
-        state.ready = true;
-        render();
-      }, err => toast('同步出错：' + err.message));
+      let loaded = 0;
+      COLS.forEach(c => {
+        this.unsubs.push(this.col(c).onSnapshot(snap => {
+          snap.docChanges().forEach(ch => {
+            if (ch.type === 'removed') state[c].delete(ch.doc.id);
+            else state[c].set(ch.doc.id, ch.doc.data());
+          });
+          loaded++;
+          if (loaded >= COLS.length) state.ready = true;
+          render();
+        }, err => toast('同步出错：' + err.message)));
+      });
     });
   },
-  col() { return this.fs.collection('users').doc(this.uid).collection('meds'); },
-  put(m) { return this.col().doc(m.id).set(clone(m)); },
-  del(id) { return this.col().doc(id).delete(); },
+  col(c) { return this.fs.collection('users').doc(this.uid).collection(c); },
+  put(c, d) { return this.col(c).doc(d.id).set(clone(d)); },
+  del(c, id) { return this.col(c).doc(id).delete(); },
   logout() { return this.auth.signOut(); }
 };
 
-function save(m) {
-  state.meds.set(m.id, m);
+function saveDoc(col, d) {
+  state[col].set(d.id, d);
   render();
-  Promise.resolve().then(() => store.put(m)).catch(e => toast('保存失败：' + e.message));
+  Promise.resolve().then(() => store.put(col, d)).catch(e => toast('保存失败：' + e.message));
 }
+function delDoc(col, id) {
+  state[col].delete(id);
+  Promise.resolve().then(() => store.del(col, id)).catch(e => toast('删除失败：' + e.message));
+}
+function save(m) { saveDoc('meds', m); }
 
 /* ---------- 弹层 ---------- */
 function showLayer(html) {
@@ -488,14 +551,21 @@ function viewHome() {
         <span class="tile-s">${sub}${chips}</span></div>
       ${svg(P.chev, 20)}</a>`;
   }).join('');
-  const soon = meds.filter(m => nearestExp(m)).sort(byExp).slice(0, 5);
-  const soonHtml = soon.length ? `<h2 class="sec">最近到期</h2><div class="card">${soon.map(m => `
-    <a class="mini" href="#/med/${m.id}">
-      <div class="mini-b"><b>${esc(m.name)}</b><small>${BOXES[m.box]}，${dot(nearestExp(m))} 到期</small></div>
-      ${daysHtml(m)}</a>`).join('')}</div>` : '';
+  const healthTiles = Object.entries(KINDS).map(([k, label]) => {
+    const ms = membersOf(k);
+    const sub = ms.length ? ms.map(x => esc(x.name)).join('、') : '还没有成员，点进去添加';
+    return `<a class="tile" href="#/health/${k}">
+      <div class="tile-ic alt">${svg(k === 'cat' ? P.cat : P.person, 30, 1.8)}</div>
+      <div class="tile-b"><span class="tile-t">${label}</span><span class="tile-s">${sub}</span></div>
+      ${svg(P.chev, 20)}</a>`;
+  }).join('');
   return topbar('', '', `<a class="icon-btn" href="#/settings" aria-label="设置">${svg(P.gear)}</a>`) +
-    `<main class="pad"><h1 class="big">家庭药箱</h1><p class="muted" style="margin:0">选择要查看的药箱</p>
-    <div class="tiles">${tiles}</div>${soonHtml}</main>`;
+    `<main class="pad">
+      <h1 class="big">家庭药箱</h1>
+      <div class="tiles">${tiles}</div>
+      <h1 class="big" style="margin-top:34px">生病记录</h1>
+      <div class="tiles">${healthTiles}</div>
+    </main>`;
 }
 
 /* ---------- 药箱列表 ---------- */
@@ -984,7 +1054,7 @@ function delMed() {
   form = null;
   if (from === '#/med/' + m.id) history.go(-2);
   else goReplace('#/box/' + m.box);
-  Promise.resolve().then(() => store.del(m.id)).catch(e => toast('删除失败：' + e.message));
+  Promise.resolve().then(() => store.del('meds', m.id)).catch(e => toast('删除失败：' + e.message));
 }
 function tooBig(m) {
   const size = new Blob([JSON.stringify(m)]).size;
@@ -1142,7 +1212,7 @@ function viewSettings() {
       <button class="line btn-line" data-act="import">导入备份</button>
     </div>
     <input type="file" id="import-in" accept="application/json,.json" hidden>
-    <p class="foot">共 ${state.meds.size} 种药品<br>版本 ${APP_VER}</p>
+    <p class="foot">${state.meds.size} 种药品 · ${state.members.size} 个成员 · ${state.logs.size} 条记录<br>版本 ${APP_VER}</p>
   </main>`;
 }
 function viewLogin() {
@@ -1186,8 +1256,9 @@ async function doAuth(kind) {
   } catch (e) { toast(authMsg(e)); }
 }
 async function exportData() {
-  const data = { app: 'yaoxiang', v: 1, exportedAt: new Date().toISOString(), meds: [...state.meds.values()] };
-  const name = `药箱备份-${todayStr()}.json`;
+  const data = { app: 'yaoxiang', v: 2, exportedAt: new Date().toISOString() };
+  COLS.forEach(c => { data[c] = [...state[c].values()]; });
+  const name = `健康管理备份-${todayStr()}.json`;
   const file = new File([JSON.stringify(data)], name, { type: 'application/json' });
   if (navigator.canShare && navigator.canShare({ files: [file] })) {
     try { await navigator.share({ files: [file] }); return; }
@@ -1200,18 +1271,420 @@ async function exportData() {
   setTimeout(() => URL.revokeObjectURL(url), 60000);
 }
 async function importData(file) {
-  let meds;
-  try { meds = (JSON.parse(await file.text()) || {}).meds || []; }
-  catch (e) { toast('这个文件不是药箱备份'); return; }
-  meds = meds.filter(m => m && m.id && m.name && m.box);
-  if (!meds.length) { toast('备份里没有药品'); return; }
-  if (!confirm(`导入 ${meds.length} 种药品？已有的相同记录会被覆盖。`)) return;
-  meds.forEach(m => {
-    state.meds.set(m.id, m);
-    Promise.resolve().then(() => store.put(m)).catch(e => toast('导入失败：' + e.message));
+  let data;
+  try { data = JSON.parse(await file.text()) || {}; }
+  catch (e) { toast('这个文件不是备份'); return; }
+  let total = 0;
+  COLS.forEach(c => { total += (data[c] || []).filter(d => d && d.id).length; });
+  if (!total) { toast('备份里没有内容'); return; }
+  if (!confirm(`导入 ${total} 条记录？已有的相同记录会被覆盖。`)) return;
+  COLS.forEach(c => {
+    (data[c] || []).filter(d => d && d.id).forEach(d => {
+      state[c].set(d.id, d);
+      Promise.resolve().then(() => store.put(c, d)).catch(e => toast('导入失败：' + e.message));
+    });
   });
   render();
-  toast(`已导入 ${meds.length} 种药品`);
+  toast(`已导入 ${total} 条记录`);
+}
+
+/* ---------- 成员与生病记录 ---------- */
+const KINDS = { human: '人', cat: '猫' };
+const SYM_COLORS = ['#A85E2B', '#5B4A82', '#2B6A85', '#2E6A4C', '#8A4F00', '#A8261C'];
+const SEC_TYPES = { multi: '多选', single: '单选', number: '数字', text: '文字' };
+const WEEK = ['日', '一', '二', '三', '四', '五', '六'];
+
+let mform = null;
+let lf = null;
+let ask = null;
+
+const membersOf = k => [...state.members.values()].filter(m => m.kind === k)
+  .sort((a, b) => a.name.localeCompare(b.name, 'zh'));
+const logsOf = id => [...state.logs.values()].filter(l => l.memberId === id)
+  .sort((a, b) => b.date.localeCompare(a.date));
+const symOf = id => state.symptoms.get(id);
+const symName = id => (symOf(id) || {}).name || '未分类';
+const symColor = id => (symOf(id) || {}).color || '#5A635E';
+const medNames = () => [...new Set([...state.meds.values()].map(m => m.name))];
+
+function ageText(birth) {
+  if (!birth) return '';
+  const b = parseYmd(birth), n = new Date();
+  let mm = (n.getFullYear() - b.getFullYear()) * 12 + (n.getMonth() - b.getMonth());
+  if (n.getDate() < b.getDate()) mm--;
+  if (mm < 0) return '';
+  const y = Math.floor(mm / 12), mo = mm % 12;
+  return y ? `${y} 岁${mo ? ` ${mo} 个月` : ''}` : `${mo} 个月`;
+}
+function listByName(name) {
+  for (const l of state.lists.values()) if (l.name === name) return l;
+  return null;
+}
+function listItems(name) {
+  const l = listByName(name);
+  return l ? l.items.slice() : [];
+}
+function addListItem(name, item) {
+  const found = listByName(name);
+  const l = found ? clone(found) : { id: uid(), name, items: [] };
+  if (!l.items.includes(item)) l.items.push(item);
+  saveDoc('lists', l);
+}
+function delListItem(name, item) {
+  const found = listByName(name);
+  if (!found) return;
+  const l = clone(found);
+  l.items = l.items.filter(x => x !== item);
+  saveDoc('lists', l);
+}
+function newSymptom(name) {
+  const s = {
+    id: uid(), name, color: SYM_COLORS[state.symptoms.size % SYM_COLORS.length],
+    sections: [{ id: uid(), name: '用药', type: 'multi' }]
+  };
+  saveDoc('symptoms', s);
+  return s;
+}
+function episodeOf(memberId, symptomId, date) {
+  const ds = [...new Set([...state.logs.values()]
+    .filter(l => l.memberId === memberId && l.symptomId === symptomId).map(l => l.date))].sort();
+  const i = ds.indexOf(date);
+  if (i < 0) return null;
+  let start = i;
+  while (start > 0 && Math.round((parseYmd(ds[start]) - parseYmd(ds[start - 1])) / 86400000) <= 7) start--;
+  return { day: i - start + 1, from: ds[start] };
+}
+function summaryOf(l) {
+  const s = symOf(l.symptomId);
+  if (!s) return '';
+  const parts = [];
+  (s.sections || []).forEach(sec => {
+    const v = (l.values || {})[sec.id];
+    if (v == null || v === '' || v === 0 || (Array.isArray(v) && !v.length)) return;
+    parts.push(`${sec.name}：${Array.isArray(v) ? v.join('、') : v}`);
+  });
+  return parts.join('　');
+}
+function avatarHtml(m, cls) {
+  return m.photo
+    ? `<img class="${cls}" src="${esc(m.photo)}" alt="">`
+    : `<div class="${cls} ph">${svg(m.kind === 'cat' ? P.cat : P.person, 26, 1.6)}</div>`;
+}
+
+/* ---------- 成员列表 ---------- */
+function viewHealth(kind) {
+  if (!KINDS[kind]) return notFound();
+  const ms = membersOf(kind);
+  const rows = ms.map(m => {
+    const last = logsOf(m.id)[0];
+    return `<a class="mem" href="#/member/${m.id}">
+      ${avatarHtml(m, 'avatar')}
+      <div class="mem-b">
+        <b>${esc(m.name)}</b>
+        ${m.birth ? `<small>${ageText(m.birth)}</small>` : ''}
+        ${last
+          ? `<small style="color:${symColor(last.symptomId)}">最近：${dot(last.date).slice(5)} ${esc(symName(last.symptomId))}</small>`
+          : '<small>还没有记录</small>'}
+      </div>
+      ${svg(P.chev, 20)}</a>`;
+  }).join('');
+  return topbar(backBtn('#/'), KINDS[kind] + '的生病记录', '') +
+    `<main class="pad">
+      ${ms.length ? `<div class="mems">${rows}</div>` : '<p class="empty">还没有成员</p>'}
+      <a class="btn wide addbtn" href="#/member/new/${kind}">${svg(P.plus, 20, 2.2)}添加${kind === 'cat' ? '一只猫' : '一个人'}</a>
+    </main>`;
+}
+
+/* ---------- 成员资料 ---------- */
+function viewMemberForm(mode, arg) {
+  const key = 'm:' + mode + ':' + arg;
+  if (!mform || mform.key !== key) {
+    if (mode === 'new') {
+      if (!KINDS[arg]) return notFound();
+      mform = { key, kind: arg, name: '', photo: '', birth: '', chip: '', note: '' };
+    } else {
+      const m = state.members.get(arg);
+      if (!m) return notFound();
+      mform = { key, id: m.id, kind: m.kind, name: m.name, photo: m.photo || '', birth: m.birth || '', chip: m.chip || '', note: m.note || '' };
+    }
+  }
+  const f = mform;
+  const cancel = f.id ? '#/member/' + f.id : '#/health/' + f.kind;
+  return topbar(`<button class="text-btn" data-act="cancel-member" data-to="${cancel}">取消</button>`,
+      mode === 'new' ? '添加成员' : '编辑资料', '') +
+    `<main class="pad form">
+      <input type="file" id="mphoto-in" accept="image/*" hidden>
+      <div class="photos">
+        ${f.photo ? `<button class="photo-thumb round" data-act="pick-mphoto" aria-label="换照片"><img src="${esc(f.photo)}" alt=""></button>`
+          : `<button class="photo-add round" data-act="pick-mphoto">${svg(P.camera, 24, 1.8)}<span>照片</span></button>`}
+      </div>
+      <div class="card">
+        <label class="line"><span>名字</span><input id="mf-name" data-mf="name" type="text" placeholder="比如 胖胖" value="${esc(f.name)}"></label>
+        <label class="line"><span>出生日期</span><input data-mf="birth" type="date" value="${f.birth}"></label>
+        <label class="line"><span>芯片号</span><input id="mf-chip" data-mf="chip" type="text" placeholder="microchip number" value="${esc(f.chip)}"></label>
+        <label class="line"><span>备注</span><textarea id="mf-note" data-mf="note" rows="1" placeholder="体重、品种、医院…">${esc(f.note)}</textarea></label>
+      </div>
+      <div class="field-l">分到哪一类</div>
+      <div class="seg2">${Object.entries(KINDS).map(([k, l]) =>
+        `<button data-act="mf-kind" data-v="${k}" class="${f.kind === k ? 'on' : ''}">${l}</button>`).join('')}</div>
+      <button class="btn primary wide" data-act="save-member">保存</button>
+      ${f.id ? '<button class="btn danger wide" data-act="del-member">删除这个成员</button>' : ''}
+    </main>`;
+}
+function saveMember() {
+  const f = mform;
+  const name = f.name.trim();
+  if (!name) { toast('请填写名字'); return; }
+  const m = {
+    id: f.id || uid(), kind: f.kind, name, photo: f.photo,
+    birth: f.birth || '', chip: f.chip.trim(), note: f.note.trim(),
+    createdAt: (state.members.get(f.id) || {}).createdAt || todayStr()
+  };
+  if (tooBig(m)) return;
+  const to = '#/member/' + m.id;
+  mform = null;
+  saveDoc('members', m);
+  if (cameFrom === to) history.back(); else goReplace(to);
+  toast('已保存');
+}
+function delMember() {
+  const m = state.members.get(mform.id);
+  if (!m) return;
+  const n = logsOf(m.id).length;
+  if (!confirm(`删除「${m.name}」？${n ? `连同 ${n} 条记录一起删除，` : ''}不能恢复。`)) return;
+  logsOf(m.id).forEach(l => delDoc('logs', l.id));
+  const from = cameFrom;
+  mform = null;
+  delDoc('members', m.id);
+  if (from === '#/member/' + m.id) history.go(-2);
+  else goReplace('#/health/' + m.kind);
+}
+
+/* ---------- 成员主页：日历 ---------- */
+function calHtml(id, cal, filter) {
+  const [y, mo] = cal.split('-').map(Number);
+  const pad = new Date(y, mo - 1, 1).getDay();
+  const total = new Date(y, mo, 0).getDate();
+  const byDate = {};
+  [...state.logs.values()]
+    .filter(l => l.memberId === id && l.date.slice(0, 7) === cal && (!filter || l.symptomId === filter))
+    .forEach(l => { (byDate[l.date] = byDate[l.date] || []).push(l.symptomId); });
+  let cells = '';
+  for (let i = 0; i < pad; i++) cells += '<span class="cal-cell"></span>';
+  for (let d = 1; d <= total; d++) {
+    const date = `${y}-${pad2(mo)}-${pad2(d)}`;
+    const syms = [...new Set(byDate[date] || [])].slice(0, 3);
+    const cls = 'cal-cell day' + (state.calDay === date ? ' on' : '') + (date === todayStr() ? ' today' : '');
+    cells += `<button class="${cls}" data-act="cal-day" data-v="${date}">
+      <span class="num">${d}</span>
+      <span class="dots">${syms.map(sid => `<i style="background:${symColor(sid)}"></i>`).join('')}</span></button>`;
+  }
+  return `<div class="cal">
+    <div class="cal-h">
+      <button class="icon-btn" data-act="cal-move" data-v="-1" aria-label="上个月">${svg(P.back, 20)}</button>
+      <b>${y} 年 ${mo} 月</b>
+      <button class="icon-btn" data-act="cal-move" data-v="1" aria-label="下个月">${svg(P.chev, 20)}</button>
+    </div>
+    <div class="cal-grid">${WEEK.map(w => `<span class="cal-w">${w}</span>`).join('')}${cells}</div>
+  </div>`;
+}
+function logRow(l) {
+  const sum = summaryOf(l);
+  return `<a class="log-row" href="#/log/${l.id}">
+    <i class="dot" style="background:${symColor(l.symptomId)}"></i>
+    <div class="log-b">
+      <b>${dot(l.date).slice(5)} ${esc(symName(l.symptomId))}</b>
+      ${sum ? `<span class="row-s">${esc(sum)}</span>` : ''}
+      ${l.note ? `<span class="row-s">${esc(l.note)}</span>` : ''}
+    </div>
+    ${(l.photos || []).length ? `<img class="log-th" src="${esc(l.photos[0])}" alt="">` : ''}
+  </a>`;
+}
+function viewMember(id) {
+  const me = state.members.get(id);
+  if (!me) return notFound();
+  const logs = logsOf(id);
+  const cal = state.cal || todayStr().slice(0, 7);
+  const filter = state.symFilter;
+  const symIds = [...new Set(logs.map(l => l.symptomId))];
+  const chips = symIds.length ? `<nav class="pills">
+      <button class="pill${filter ? '' : ' on'}" data-act="sym-filter" data-v="">全部 ${logs.length}</button>
+      ${symIds.map(sid => `<button class="pill${filter === sid ? ' on' : ''}" data-act="sym-filter" data-v="${sid}">
+        <i class="dot" style="background:${symColor(sid)}"></i>${esc(symName(sid))} ${logs.filter(l => l.symptomId === sid).length}</button>`).join('')}
+    </nav>` : '';
+  let shown = logs.filter(l => (!filter || l.symptomId === filter));
+  shown = state.calDay ? shown.filter(l => l.date === state.calDay) : shown.filter(l => l.date.slice(0, 7) === cal);
+  const listTitle = state.calDay ? `${dot(state.calDay)} 的记录` : `${Number(cal.slice(5))} 月记录`;
+  return topbar(backBtn('#/health/' + me.kind), esc(me.name),
+      `<a class="icon-btn" href="#/member/edit/${me.id}" aria-label="资料">${svg(P.edit)}</a>`) +
+    `<section class="hero" style="padding-bottom:6px">
+      ${avatarHtml(me, 'avatar big')}
+      <div class="hero-b">
+        ${me.birth ? `<p style="font-size:17px;color:var(--ink)">${ageText(me.birth)}</p>` : ''}
+        ${me.chip ? `<p style="font-size:13px">芯片 ${esc(me.chip)}</p>` : ''}
+      </div>
+    </section>
+    ${me.note ? `<p class="mem-note">${esc(me.note)}</p>` : ''}
+    ${chips}
+    <main class="pad" style="padding-top:4px;padding-bottom:120px">
+      ${calHtml(id, cal, filter)}
+      <div class="sec-row"><h2 class="sec">${listTitle}</h2>
+        ${state.calDay ? '<button class="link-btn" data-act="cal-day" data-v="">看整个月</button>' : ''}</div>
+      ${shown.length ? `<div class="logs">${shown.map(logRow).join('')}</div>`
+        : '<p class="empty">这段时间没有记录</p>'}
+    </main>
+    <a class="fab" href="#/log/new/${id}" aria-label="添加记录">${svg(P.plus, 28, 2.2)}</a>`;
+}
+
+/* ---------- 一条记录 ---------- */
+function viewLog(mode, arg) {
+  const key = 'l:' + mode + ':' + arg;
+  if (!lf || lf.key !== key) {
+    if (mode === 'new') {
+      if (!state.members.get(arg)) return notFound();
+      const first = [...state.symptoms.values()][0];
+      lf = { key, memberId: arg, symptomId: first ? first.id : '', date: state.calDay || todayStr(), values: {}, photos: [], note: '' };
+    } else {
+      const l = state.logs.get(arg);
+      if (!l) return notFound();
+      lf = { key, id: l.id, memberId: l.memberId, symptomId: l.symptomId, date: l.date,
+        values: clone(l.values || {}), photos: (l.photos || []).slice(), note: l.note || '', createdAt: l.createdAt };
+    }
+  }
+  const me = state.members.get(lf.memberId);
+  if (!me) return notFound();
+  const sym = symOf(lf.symptomId);
+  const syms = [...state.symptoms.values()];
+  const ep = lf.id ? episodeOf(lf.memberId, lf.symptomId, lf.date) : null;
+
+  const symChips = `<div class="quick">
+    ${syms.map(s => `<button class="opt-chip${s.id === lf.symptomId ? ' on' : ''}" data-act="pick-sym" data-v="${s.id}" style="${s.id === lf.symptomId ? `background:${s.color};border-color:${s.color};color:#fff` : ''}">${esc(s.name)}</button>`).join('')}
+    <button class="opt-chip add" data-act="new-sym">+ 新症状</button></div>`;
+
+  const sections = sym ? (sym.sections || []).map(sec => {
+    const v = lf.values[sec.id];
+    let body = '';
+    if (sec.type === 'multi' || sec.type === 'single') {
+      let opts = listItems(sec.name);
+      if (sec.name === '用药') opts = [...new Set([...opts, ...medNames()])];
+      const cur = sec.type === 'multi' ? (Array.isArray(v) ? v : []) : (v ? [v] : []);
+      opts = [...new Set([...opts, ...cur])];
+      body = `<div class="quick">
+        ${opts.map(o => `<button class="opt-chip${cur.includes(o) ? ' on' : ''}" data-act="opt" data-sec="${sec.id}" data-v="${esc(o)}">${cur.includes(o) ? svg(P.check, 15, 2.6) : ''}${esc(o)}</button>`).join('')}
+        <button class="opt-chip add" data-act="opt-add" data-sec="${sec.id}">+ 加一项</button></div>`;
+    } else if (sec.type === 'number') {
+      const n = Number(v || 0);
+      body = `<div class="stepper start">
+        <button data-act="sec-n" data-sec="${sec.id}" data-v="-1" aria-label="减少"${n <= 0 ? ' disabled' : ''}>${svg(P.minus, 20, 2.2)}</button>
+        <b class="num">${n}</b>
+        <button data-act="sec-n" data-sec="${sec.id}" data-v="1" aria-label="增加">${svg(P.plus, 20, 2.2)}</button></div>`;
+    } else {
+      body = `<input class="sec-input" type="text" data-sec="${sec.id}" placeholder="写点什么" value="${esc(v || '')}">`;
+    }
+    return `<div class="sec-block">
+      <div class="sec-head"><span>${esc(sec.name)}</span>
+        <button class="link-btn" data-act="sec-manage" data-sec="${sec.id}">管理</button></div>
+      ${body}</div>`;
+  }).join('') : '';
+
+  const photos = `<div class="photos">
+    ${lf.photos.map((p, i) => `<button class="photo-thumb" data-act="lphoto-menu" data-i="${i}" aria-label="第 ${i + 1} 张照片"><img src="${esc(p)}" alt=""></button>`).join('')}
+    ${lf.photos.length < 3 ? `<button class="photo-add" data-act="pick-lphoto">${svg(P.camera, 24, 1.8)}<span>加照片</span></button>` : ''}
+  </div>`;
+
+  const cancel = '#/member/' + lf.memberId;
+  return topbar(`<button class="text-btn" data-act="cancel-log" data-to="${cancel}">取消</button>`,
+      `${esc(me.name)} · ${mode === 'new' ? '添加记录' : '记录'}`, '') +
+    `<main class="pad form" style="padding-bottom:40px">
+      <input type="file" id="lphoto-in" accept="image/*" hidden>
+      <div class="card">
+        <label class="line"><span>日期</span><input data-lf="date" type="date" value="${lf.date}"></label>
+      </div>
+      ${ep && ep.day > 1 ? `<p class="hint">这次发作从 ${dot(ep.from)} 开始，这是第 ${ep.day} 天</p>` : ''}
+      <div class="field-l">症状</div>
+      ${symChips}
+      ${sections}
+      ${sym ? `<button class="btn wide addbtn" data-act="sec-add">${svg(P.plus, 20, 2.2)}加一个板块</button>` : '<p class="hint">先选一个症状，下面才会出现要填的内容</p>'}
+      <div class="field-l">备注</div>
+      <div class="card"><label class="line"><span></span><textarea id="lf-note" data-lf="note" rows="2" placeholder="随便写点什么">${esc(lf.note)}</textarea></label></div>
+      <div class="field-l">照片</div>
+      ${photos}
+      <button class="btn primary wide" data-act="save-log">保存</button>
+      ${lf.id ? '<button class="btn danger wide" data-act="del-log">删除这条记录</button>' : ''}
+    </main>`;
+}
+function saveLog() {
+  if (!lf.symptomId) { toast('先选一个症状'); return; }
+  const l = {
+    id: lf.id || uid(), memberId: lf.memberId, symptomId: lf.symptomId,
+    date: lf.date || todayStr(), values: lf.values, photos: lf.photos,
+    note: lf.note.trim(), createdAt: lf.createdAt || todayStr()
+  };
+  if (tooBig(l)) return;
+  const to = '#/member/' + l.memberId;
+  lf = null;
+  saveDoc('logs', l);
+  if (cameFrom === to) history.back(); else goReplace(to);
+  toast('已保存');
+}
+function delLog() {
+  if (!confirm('删除这条记录？')) return;
+  const to = '#/member/' + lf.memberId;
+  const id = lf.id;
+  const from = cameFrom;
+  lf = null;
+  delDoc('logs', id);
+  if (from === to) history.back(); else goReplace(to);
+}
+
+/* ---------- 板块与选项的管理 ---------- */
+function askText(title, placeholder, cb) {
+  ask = { cb, value: '' };
+  showLayer(`<div class="scrim" data-act="close-ask"></div>
+    <div class="sheet" role="dialog" aria-label="${esc(title)}">
+      <h2 class="sheet-t">${esc(title)}</h2>
+      <input id="ask-in" class="ask-in" type="text" placeholder="${esc(placeholder)}" enterkeyhint="done">
+      <div class="actions2">
+        <button class="btn" data-act="close-ask">取消</button>
+        <button class="btn primary" data-act="ask-ok">确定</button>
+      </div></div>`);
+  setTimeout(() => { const el = document.getElementById('ask-in'); if (el) el.focus(); }, 60);
+}
+function addSectionFlow() {
+  askText('新板块叫什么', '比如 前一天吃了什么', name => {
+    showLayer(`<div class="scrim" data-act="close"></div>
+      <div class="sheet menu-sheet" role="dialog" aria-label="板块类型">
+        <h2 class="sheet-t">${esc(name)}</h2>
+        <p>这个板块怎么填？</p>
+        ${Object.entries(SEC_TYPES).map(([t, l]) =>
+          `<button data-act="sec-type" data-v="${t}" data-name="${esc(name)}"><span>${l}</span><span class="muted">${
+            t === 'multi' ? '一排能勾选的项，可多选' :
+            t === 'single' ? '一排能勾选的项，只选一个' :
+            t === 'number' ? '加减数字，比如次数' : '自己打字'}</span></button>`).join('')}
+        <button data-act="close">取消</button>
+      </div>`);
+  });
+}
+function manageSection(secId) {
+  const sym = symOf(lf.symptomId);
+  const sec = (sym.sections || []).find(x => x.id === secId);
+  if (!sec) return;
+  const opts = (sec.type === 'multi' || sec.type === 'single') ? listItems(sec.name) : [];
+  showLayer(`<div class="scrim" data-act="close"></div>
+    <div class="sheet menu-sheet" role="dialog" aria-label="管理板块">
+      <h2 class="sheet-t">${esc(sec.name)}</h2>
+      ${opts.length ? opts.map(o => `<button data-act="opt-del" data-sec="${sec.id}" data-v="${esc(o)}"><span>${esc(o)}</span><span class="danger">删除</span></button>`).join('')
+        : '<p>这个板块没有可删的选项</p>'}
+      <button class="danger" data-act="sec-del" data-sec="${sec.id}">删除整个板块</button>
+      <button data-act="close">完成</button>
+    </div>`);
+}
+function sectionAdd(name, type) {
+  const sym = clone(symOf(lf.symptomId));
+  sym.sections = sym.sections || [];
+  sym.sections.push({ id: uid(), name, type });
+  saveDoc('symptoms', sym);
+  closeLayer();
 }
 
 /* ---------- 路由与渲染 ---------- */
@@ -1231,6 +1704,12 @@ function renderView() {
     else if (a === 'med') html = viewMed(b);
     else if (a === 'add') html = viewForm('add', b);
     else if (a === 'edit') html = viewForm('edit', b);
+    else if (a === 'health') html = viewHealth(b);
+    else if (a === 'member' && b === 'new') html = viewMemberForm('new', c);
+    else if (a === 'member' && b === 'edit') html = viewMemberForm('edit', c);
+    else if (a === 'member') html = viewMember(b);
+    else if (a === 'log' && b === 'new') html = viewLog('new', c);
+    else if (a === 'log') html = viewLog('edit', b);
     else if (a === 'settings') html = viewSettings();
     else html = notFound();
   }
@@ -1343,6 +1822,103 @@ const actions = {
     if (cameFrom === to) history.back();
     else goReplace(to);
   },
+  'cancel-member': el => { const to = el.dataset.to; mform = null; if (cameFrom === to) history.back(); else goReplace(to); },
+  'cancel-log': el => { const to = el.dataset.to; lf = null; if (cameFrom === to) history.back(); else goReplace(to); },
+  'mf-kind': el => { mform.kind = el.dataset.v; render(); },
+  'save-member': saveMember,
+  'del-member': delMember,
+  'pick-mphoto': () => { photoPending = { target: 'member' }; document.getElementById('mphoto-in').click(); },
+  'pick-lphoto': () => { photoPending = { target: 'log', mode: 'add' }; document.getElementById('lphoto-in').click(); },
+  'lphoto-menu': el => {
+    const i = Number(el.dataset.i);
+    showLayer(`<div class="scrim" data-act="close"></div>
+      <div class="sheet menu-sheet" role="dialog" aria-label="照片操作">
+        <button data-act="lph-edit" data-i="${i}">放大 / 缩小 调整</button>
+        <button data-act="lph-replace" data-i="${i}">换一张</button>
+        <button class="danger" data-act="lph-del" data-i="${i}">删除这张</button>
+        <button data-act="close">取消</button></div>`);
+  },
+  'lph-edit': el => {
+    const i = Number(el.dataset.i);
+    openCropper(lf.photos[i], data => { lf.photos[i] = data; render(); });
+  },
+  'lph-replace': el => {
+    photoPending = { target: 'log', mode: 'replace', i: Number(el.dataset.i) };
+    closeLayer();
+    document.getElementById('lphoto-in').click();
+  },
+  'lph-del': el => { lf.photos.splice(Number(el.dataset.i), 1); closeLayer(); render(); },
+  'cal-move': el => {
+    const cal = state.cal || todayStr().slice(0, 7);
+    const [y, m] = cal.split('-').map(Number);
+    const d = new Date(y, m - 1 + Number(el.dataset.v), 1);
+    state.cal = d.getFullYear() + '-' + pad2(d.getMonth() + 1);
+    state.calDay = '';
+    render();
+  },
+  'cal-day': el => {
+    const v = el.dataset.v;
+    state.calDay = (v && state.calDay !== v) ? v : '';
+    render();
+  },
+  'sym-filter': el => { state.symFilter = el.dataset.v; render(); },
+  'pick-sym': el => { lf.symptomId = el.dataset.v; render(); },
+  'new-sym': () => askText('新症状叫什么', '比如 呕吐、疱疹', name => { lf.symptomId = newSymptom(name).id; render(); }),
+  opt: el => {
+    const sym = symOf(lf.symptomId);
+    const sec = (sym.sections || []).find(x => x.id === el.dataset.sec);
+    const v = el.dataset.v;
+    if (sec.type === 'multi') {
+      const cur = Array.isArray(lf.values[sec.id]) ? lf.values[sec.id].slice() : [];
+      lf.values[sec.id] = cur.includes(v) ? cur.filter(x => x !== v) : cur.concat(v);
+    } else {
+      lf.values[sec.id] = lf.values[sec.id] === v ? '' : v;
+    }
+    render();
+  },
+  'opt-add': el => {
+    const secId = el.dataset.sec;
+    const sym = symOf(lf.symptomId);
+    const sec = (sym.sections || []).find(x => x.id === secId);
+    askText('加一项：' + sec.name, '写上名字', v => {
+      addListItem(sec.name, v);
+      if (sec.type === 'multi') {
+        const cur = Array.isArray(lf.values[sec.id]) ? lf.values[sec.id].slice() : [];
+        lf.values[sec.id] = cur.concat(v);
+      } else lf.values[sec.id] = v;
+      render();
+    });
+  },
+  'opt-del': el => {
+    const sym = symOf(lf.symptomId);
+    const sec = (sym.sections || []).find(x => x.id === el.dataset.sec);
+    delListItem(sec.name, el.dataset.v);
+    manageSection(sec.id);
+  },
+  'sec-n': el => {
+    const id = el.dataset.sec;
+    lf.values[id] = Math.max(0, Number(lf.values[id] || 0) + Number(el.dataset.v));
+    render();
+  },
+  'sec-manage': el => manageSection(el.dataset.sec),
+  'sec-add': addSectionFlow,
+  'sec-type': el => sectionAdd(el.dataset.name, el.dataset.v),
+  'sec-del': el => {
+    const sym = clone(symOf(lf.symptomId));
+    sym.sections = (sym.sections || []).filter(x => x.id !== el.dataset.sec);
+    saveDoc('symptoms', sym);
+    closeLayer();
+  },
+  'save-log': saveLog,
+  'del-log': delLog,
+  'close-ask': () => { ask = null; closeLayer(); },
+  'ask-ok': () => {
+    const v = (ask.value || '').trim();
+    const cb = ask.cb;
+    ask = null;
+    closeLayer();
+    if (v) cb(v);
+  },
   'save-form': saveForm,
   'del-med': delMed,
   login: () => doAuth('login'),
@@ -1362,6 +1938,18 @@ document.addEventListener('click', e => {
 document.addEventListener('input', e => {
   const t = e.target;
   if (t.id === 'q') { state.search = t.value; render(); return; }
+  if (t.id === 'ask-in' && ask) { ask.value = t.value; return; }
+  if (t.dataset.mf && mform) {
+    mform[t.dataset.mf] = t.value;
+    if (t.tagName === 'TEXTAREA') grow(t);
+    return;
+  }
+  if (t.dataset.lf && lf) {
+    lf[t.dataset.lf] = t.value;
+    if (t.tagName === 'TEXTAREA') grow(t);
+    return;
+  }
+  if (t.dataset.sec && lf) { lf.values[t.dataset.sec] = t.value; return; }
   if (t.id === 'open-date' && openEdit) { openEdit.date = t.value; return; }
   if (t.dataset.in && sheet) { sheet[t.dataset.in] = t.value; return; }
   if (t.dataset.fr && form) {
@@ -1381,6 +1969,12 @@ document.addEventListener('input', e => {
   }
 });
 document.addEventListener('keydown', e => {
+  if (e.target.id === 'ask-in' && e.key === 'Enter' && !e.isComposing) {
+    e.preventDefault();
+    const btn = document.querySelector('[data-act="ask-ok"]');
+    if (btn) btn.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    return;
+  }
   if (e.target.id === 'tag-in' && e.key === 'Enter' && !e.isComposing) {
     e.preventDefault();
     if (form) { commitTag(); render(); }
@@ -1389,14 +1983,22 @@ document.addEventListener('keydown', e => {
 });
 document.addEventListener('change', async e => {
   const t = e.target;
-  if (t.id === 'photo-in' && t.files && t.files[0]) {
+  if ((t.id === 'photo-in' || t.id === 'mphoto-in' || t.id === 'lphoto-in') && t.files && t.files[0]) {
     const reader = new FileReader();
     const pending = photoPending || { mode: 'add' };
     reader.onload = () => openCropper(reader.result, data => {
+      photoPending = null;
+      if (pending.target === 'member') { if (mform) { mform.photo = data; render(); } return; }
+      if (pending.target === 'log') {
+        if (!lf) return;
+        if (pending.mode === 'replace') lf.photos[pending.i] = data;
+        else if (lf.photos.length < 3) lf.photos.push(data);
+        render();
+        return;
+      }
       if (!form) return;
       if (pending.mode === 'replace') form.photos[pending.i] = data;
       else if (form.photos.length < MAX_PHOTOS) form.photos.push(data);
-      photoPending = null;
       render();
     });
     reader.onerror = () => toast('照片读取失败，换一张试试');
@@ -1419,6 +2021,9 @@ window.addEventListener('hashchange', () => {
   lastHash = location.hash;
   const r = route();
   if (r[0] !== 'add' && r[0] !== 'edit') form = null;
+  if (r[0] !== 'member' || (r[1] !== 'new' && r[1] !== 'edit')) mform = null;
+  if (r[0] !== 'log') lf = null;
+  if (r[0] !== 'member' && r[0] !== 'log') { state.cal = ''; state.calDay = ''; state.symFilter = ''; }
   state.search = '';
   state.searchOpen = false;
   state.expiredOpen = false;
