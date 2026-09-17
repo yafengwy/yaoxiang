@@ -330,7 +330,7 @@ const BOXES = { cat: '猫用药', human: '人用药' };
 const REMIND_OPTIONS = [30, 60, 120];
 const LOG_TEXT = { add: '添加', in: '入库', use: '用完', open: '开封' };
 const FB_VER = '10.12.2';
-const APP_VER = '2026.09.17-23';
+const APP_VER = '2026.09.17-26';
 const MAX_PHOTOS = 6;
 const PHOTO_PX = 640;
 const PHOTO_Q = 0.62;
@@ -1314,7 +1314,7 @@ async function importData(file) {
 
 /* ---------- 成员与生病记录 ---------- */
 const KINDS = { cat: '猫', human: '人' };
-const SYM_COLORS = ['#C2582B', '#7A4FB5', '#2F77B8', '#3F8C33', '#C43F7B', '#0E8C80', '#B3261E'];
+const SYM_COLORS = ['#E0761A', '#8B5CF6', '#2F8FD6', '#4CAF3F', '#EC4899', '#12B5A5', '#D92D20'];
 const SEC_TYPES = { multi: '多选', single: '单选', number: '数字', text: '文字' };
 const WEEK = ['日', '一', '二', '三', '四', '五', '六'];
 
@@ -1332,6 +1332,12 @@ const symOf = id => state.symptoms.get(id);
 const symName = id => (symOf(id) || {}).name || '未分类';
 const symColor = id => (symOf(id) || {}).color || '#5A635E';
 const medNames = () => [...new Set([...state.meds.values()].map(m => m.name))];
+function textOn(hex) {
+  const c = String(hex).replace('#', '');
+  if (c.length < 6) return '#FFFFFF';
+  const r = parseInt(c.slice(0, 2), 16), g = parseInt(c.slice(2, 4), 16), b = parseInt(c.slice(4, 6), 16);
+  return (0.299 * r + 0.587 * g + 0.114 * b) > 150 ? '#1D2320' : '#FFFFFF';
+}
 
 function weightText(w) {
   const n = parseFloat(String(w).replace(/[^\d.]/g, ''));
@@ -1377,14 +1383,32 @@ function newSymptom(name) {
   saveDoc('symptoms', s);
   return s;
 }
+function logsFor(memberId, symptomId) {
+  return [...state.logs.values()]
+    .filter(l => l.memberId === memberId && l.symptomId === symptomId)
+    .sort((a, b) => a.date.localeCompare(b.date));
+}
 function episodeOf(memberId, symptomId, date) {
-  const ds = [...new Set([...state.logs.values()]
-    .filter(l => l.memberId === memberId && l.symptomId === symptomId).map(l => l.date))].sort();
-  const i = ds.indexOf(date);
+  const arr = logsFor(memberId, symptomId);
+  let i = arr.findIndex(l => l.date === date);
   if (i < 0) return null;
-  let start = i;
-  while (start > 0 && Math.round((parseYmd(ds[start]) - parseYmd(ds[start - 1])) / 86400000) <= 7) start--;
-  return { day: i - start + 1, from: ds[start] };
+  let s = i;
+  while (s > 0 && !arr[s - 1].healed) s--;
+  const from = arr[s].date;
+  const day = Math.round((parseYmd(date) - parseYmd(from)) / 86400000) + 1;
+  return { day, from };
+}
+function episodeCount(memberId, symptomId) {
+  const arr = logsFor(memberId, symptomId);
+  if (!arr.length) return 0;
+  const sy = symOf(symptomId);
+  if (sy && sy.healTrack === false) return arr.length;
+  let n = 0, open = false;
+  arr.forEach(l => {
+    if (!open) { n++; open = true; }
+    if (l.healed) open = false;
+  });
+  return n;
 }
 function summaryOf(l) {
   const s = symOf(l.symptomId);
@@ -1457,7 +1481,7 @@ function viewMemberForm(mode, arg) {
         <label class="line"><span>名字</span><input id="mf-name" data-mf="name" type="text" placeholder="比如 胖胖" value="${esc(f.name)}"></label>
         <label class="line"><span>出生日期</span><input data-mf="birth" type="date" value="${f.birth}"></label>
         <label class="line"><span>体重（lb）</span><input id="mf-weight" data-mf="weight" type="text" inputmode="decimal" placeholder="比如 9.5" value="${esc(f.weight)}"></label>
-        <label class="line"><span>芯片号</span><input id="mf-chip" data-mf="chip" type="text" placeholder="microchip number" value="${esc(f.chip)}"></label>
+        ${f.kind === 'cat' ? `<label class="line"><span>芯片号</span><input id="mf-chip" data-mf="chip" type="text" placeholder="microchip number" value="${esc(f.chip)}"></label>` : ''}
         ${f.fields.map((x, i) => `<label class="line"><span>${esc(x.label)}</span>
           <input id="mf-fx-${i}" data-mfx="${i}" type="text" placeholder="写点什么" value="${esc(x.value)}">
           <button class="icon-btn small" data-act="mf-field-del" data-i="${i}" aria-label="删掉这一栏">${svg(P.close, 16)}</button></label>`).join('')}
@@ -1465,9 +1489,6 @@ function viewMemberForm(mode, arg) {
       <button class="btn wide addbtn" data-act="mf-field-add">${svg(P.plus, 20, 2.2)}加一栏</button>
       <div class="field-l">备注</div>
       <textarea id="mf-note" class="note-input" data-mf="note" rows="3" placeholder="医院、疫苗、过敏…">${esc(f.note)}</textarea>
-      <div class="field-l">分到哪一类</div>
-      <div class="seg2">${Object.entries(KINDS).map(([k, l]) =>
-        `<button data-act="mf-kind" data-v="${k}" class="${f.kind === k ? 'on' : ''}">${l}</button>`).join('')}</div>
       <button class="btn primary wide" data-act="save-member">保存</button>
       ${f.id ? '<button class="btn danger wide" data-act="del-member">删除这个成员</button>' : ''}
     </main>`;
@@ -1635,10 +1656,13 @@ function viewMember(id) {
   const filter = state.symFilter;
   const range = calRange(anchor, state.calView);
   const symIds = [...new Set(logs.map(l => l.symptomId))];
+  const counts = {};
+  symIds.forEach(sid => { counts[sid] = episodeCount(id, sid); });
+  const totalTimes = symIds.reduce((n, sid) => n + counts[sid], 0);
   const chips = symIds.length ? `<nav class="pills">
-      <button class="pill${filter ? '' : ' on'}" data-act="sym-filter" data-v="">全部 ${logs.length}</button>
+      <button class="pill${filter ? '' : ' on'}" data-act="sym-filter" data-v="">全部 ${totalTimes} 次</button>
       ${symIds.map(sid => `<button class="pill${filter === sid ? ' on' : ''}" data-act="sym-filter" data-v="${sid}">
-        <i class="dot" style="background:${symColor(sid)}"></i>${esc(symName(sid))} ${logs.filter(l => l.symptomId === sid).length}</button>`).join('')}
+        <i class="dot" style="background:${symColor(sid)}"></i>${esc(symName(sid))} ${counts[sid]} 次</button>`).join('')}
     </nav>` : '';
   let shown = logs.filter(l => (!filter || l.symptomId === filter));
   shown = state.calDay ? shown.filter(l => l.date === state.calDay)
@@ -1764,7 +1788,7 @@ function viewLog(mode, arg) {
   const ep = lf.id ? episodeOf(lf.memberId, lf.symptomId, lf.date) : null;
 
   const symChips = `<div class="quick">
-    ${syms.map(s => `<button class="opt-chip${s.id === lf.symptomId ? ' on' : ''}" data-act="pick-sym" data-v="${s.id}" style="${s.id === lf.symptomId ? `background:${s.color};border-color:${s.color};color:#fff` : ''}">${esc(s.name)}</button>`).join('')}
+    ${syms.map(s => `<button class="opt-chip${s.id === lf.symptomId ? ' on' : ''}" data-act="pick-sym" data-v="${s.id}" style="${s.id === lf.symptomId ? `background:${s.color};border-color:${s.color};color:${textOn(s.color)}` : ''}">${esc(s.name)}</button>`).join('')}
     <button class="opt-chip add" data-act="new-sym">+ 新症状</button></div>`;
 
   const sections = sym ? sectionsHtml(sym, lf.values) : '';
@@ -1789,7 +1813,7 @@ function viewLog(mode, arg) {
           </div>
         </div>` : ''}
       </div>
-      ${ep && ep.day > 1 ? `<p class="hint">这次发作从 ${dot(ep.from)} 开始，这是第 ${ep.day} 天</p>` : ''}
+      ${ep && ep.day > 1 && sym && sym.healTrack !== false ? `<p class="hint">这次从 ${dot(ep.from)} 开始，这是第 ${ep.day} 天</p>` : ''}
       <div class="field-l">症状</div>
       ${symChips}
       ${sections}
@@ -2020,7 +2044,6 @@ const actions = {
   },
   'cancel-member': el => { const to = el.dataset.to; mform = null; if (cameFrom === to) history.back(); else goReplace(to); },
   'cancel-log': el => { const to = el.dataset.to; lf = null; if (cameFrom === to) history.back(); else goReplace(to); },
-  'mf-kind': el => { mform.kind = el.dataset.v; render(); },
   'mf-field-add': () => askText('加一栏叫什么', '比如 医院、疫苗', label => { mform.fields.push({ label, value: '' }); render(); }),
   'mf-field-del': el => { mform.fields.splice(Number(el.dataset.i), 1); render(); },
   'opt-from-box': el => {
