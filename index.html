@@ -94,6 +94,8 @@ button:disabled{opacity:.4;cursor:default}
 .row-t b{font-size:17px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .row-t small{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .row-s{font-size:13px;color:var(--muted)}
+.row-s .qty{font-size:16px;font-weight:700;color:var(--ink)}
+.row-s .warn-t .qty{color:var(--warn)}
 .tags{display:flex;flex-wrap:wrap;gap:4px}
 .tag{font-size:12px;padding:1px 8px;border-radius:8px;background:var(--accent-soft);color:var(--accent);border:0}
 button.tag{height:34px;padding:0 12px;font-size:14px;border-radius:10px;display:inline-flex;align-items:center;gap:4px}
@@ -488,7 +490,7 @@ function medRow(m) {
     <div class="row-b">
       <div class="row-t"><b>${esc(m.name)}</b>${m.spec ? `<small>${esc(m.spec)}</small>` : ''}</div>
       ${tagsHtml(m, false)}
-      <div class="row-s">共 ${tot} 件${op ? `，<span class="warn-t">${op} 件已开封</span>` : ''}</div>
+      <div class="row-s">共 <b class="qty">${tot}</b> 件${op ? `，<span class="warn-t"><b class="qty">${op}</b> 件已开封</span>` : ''}</div>
       <div class="row-s">${e ? dot(e) + ' 到期' : '已用完'}</div>
     </div>
     ${daysHtml(m)}</a>`;
@@ -655,7 +657,7 @@ function renderSheet() {
         <button class="btn" data-act="do-use">用完</button>
         <button class="btn primary" data-act="do-open"${sel && !sel.opened ? '' : ' disabled'}>开封</button>
       </div>
-      <p class="hint">${sel && sel.opened ? '这一批已经开封了' : '开封只记录日期，不改变数量；用完会减少数量'}</p>`;
+      <p class="hint">${sel && sel.opened ? '这一批已经开封了' : '点「开封」时，上面的日期就是开封日期，可以改成前几天；开封不会减少数量'}</p>`;
   } else {
     const exps = [...new Set(bs.map(b => b.exp))];
     body = `<label class="line"><span>过期日期</span><input type="date" data-in="exp" value="${s.exp}"></label>
@@ -823,16 +825,17 @@ function viewForm(mode, arg) {
         `<button data-act="f-box" data-v="${k}" class="${f.box === k ? 'on' : ''}">${l}</button>`).join('')}</div>
 
       ${f.rows.map((r, i) => `<div class="card">
-        ${i > 0 || r.opened ? `<div class="line"><span>${r.opened ? dot(r.opened) + ' 开封' : '第 ' + (i + 1) + ' 个过期日期'}</span>
+        ${mode === 'edit' || i > 0 ? `<div class="line"><span>第 ${i + 1} 批</span>
           <button class="link-btn" style="color:var(--bad)" data-act="f-row-del" data-i="${i}">删除</button></div>` : ''}
         <label class="line"><span>过期日期</span><input id="f-exp-${i}" data-fr="exp" data-i="${i}" type="date" value="${r.exp}"></label>
+        ${mode === 'edit' ? `<label class="line"><span>开封日期</span><input data-fr="opened" data-i="${i}" type="date" value="${r.opened || ''}"></label>` : ''}
         <div class="line"><span>数量</span><div class="stepper">
           <button data-act="f-qty" data-i="${i}" data-v="-1" aria-label="减少"${r.qty <= 1 ? ' disabled' : ''}>${svg(P.minus, 20, 2.2)}</button>
           <b class="num">${r.qty}</b>
           <button data-act="f-qty" data-i="${i}" data-v="1" aria-label="增加">${svg(P.plus, 20, 2.2)}</button></div></div>
       </div>`).join('')}
       <button class="btn wide" data-act="f-row-add">+ 再加一个过期日期</button>
-      <p class="hint">同一种药有不同的过期日期，就分开填。列表里只显示一条，数量是加起来的总数。</p>
+      <p class="hint">同一种药有不同的过期日期，就分开填。列表里只显示一条，数量是加起来的总数。${mode === 'edit' ? '开封日期留空就是未开封。' : ''}</p>
 
       <div class="field-l">过期提醒</div>
       <div class="seg3">${REMIND_OPTIONS.map(n =>
@@ -867,7 +870,13 @@ function saveForm() {
     const rows = f.rows.filter(r => r.exp && r.qty > 0);
     if (!rows.length) { toast('至少留一个过期日期'); return; }
     Object.assign(m, { name, spec: f.spec.trim(), note: f.note.trim(), tags: f.tags, photos: f.photos, box: f.box, remindDays: f.remindDays });
-    m.batches = rows.map(r => ({ id: r.id || uid(), exp: r.exp, qty: r.qty, opened: r.opened || null }));
+    const merged = [];
+    rows.forEach(r => {
+      const same = merged.find(x => x.exp === r.exp && (x.opened || null) === (r.opened || null));
+      if (same) same.qty += r.qty;
+      else merged.push({ id: r.id || uid(), exp: r.exp, qty: r.qty, opened: r.opened || null });
+    });
+    m.batches = merged;
     delete m.photo;
     if (tooBig(m)) return;
     form = null;
