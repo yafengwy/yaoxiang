@@ -1,5 +1,5 @@
 // 离线缓存：本站文件先走网络、失败用缓存；字体和 Firebase 脚本优先用缓存
-const CACHE = 'yaoxiang-v1';
+const CACHE = 'yaoxiang-v4';
 const CORE = ['./', './index.html', './manifest.json', './icon-180.png', './icon-192.png', './icon-512.png'];
 const CDN = ['www.gstatic.com', 'fonts.googleapis.com', 'fonts.gstatic.com'];
 
