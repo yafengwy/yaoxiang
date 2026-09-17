@@ -253,7 +253,7 @@ const BOXES = { human: '人用药', cat: '猫用药' };
 const REMIND_OPTIONS = [30, 60, 120];
 const LOG_TEXT = { add: '添加', in: '入库', use: '用完', open: '开封' };
 const FB_VER = '10.12.2';
-const APP_VER = '2026.09.17-9';
+const APP_VER = '2026.09.17-10';
 const MAX_PHOTOS = 6;
 const PHOTO_PX = 640;
 const PHOTO_Q = 0.62;
@@ -574,9 +574,9 @@ function viewMed(id) {
     : d < 0 ? `<span class="st-bad">已过期 <b class="num">${-d}</b> 天</span>`
     : `<span class="st-${status(m)}">距离过期 <b class="num">${d}</b> 天</span>`;
 
-  const remind = `<label class="line"><span>过期提醒</span>
+  const remind = `<label class="line"><span>提前</span>
     <select data-change="remind" data-id="${m.id}">${REMIND_OPTIONS.map(n =>
-      `<option value="${n}"${n === m.remindDays ? ' selected' : ''}>过期前 ${n} 天</option>`).join('')}</select></label>`;
+      `<option value="${n}"${n === m.remindDays ? ' selected' : ''}>${n} 天</option>`).join('')}</select></label>`;
 
   const seen = new Set();
   const batches = bs.length ? bs.map(b => {
@@ -622,9 +622,10 @@ function viewMed(id) {
     <main class="pad detail">
       ${noteHtml}
       <div class="sec-row"><h2 class="sec">期限</h2>${distance}</div>
-      <div class="card">${remind}</div>
       <h2 class="sec">批次</h2>${batches}
       ${logHtml}
+      <h2 class="sec">过期提醒</h2>
+      <div class="card">${remind}</div>
       <p class="foot">添加于 ${dot(m.createdAt)}</p>
     </main>
     <div class="bottombar">
