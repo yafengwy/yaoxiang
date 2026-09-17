@@ -319,7 +319,9 @@ function status(m) {
   if (d <= (m.remindDays || 60)) return 'warn';
   return 'ok';
 }
-const isAlert = m => ['warn', 'bad'].includes(status(m));
+const isWarn = m => status(m) === 'warn';
+const isBad = m => status(m) === 'bad';
+const isAlert = m => isWarn(m) || isBad(m);
 function byExp(a, b) {
   const ea = nearestExp(a), eb = nearestExp(b);
   if (!ea && !eb) return a.name.localeCompare(b.name, 'zh');
@@ -432,7 +434,7 @@ function closeLayer() {
 /* ---------- 通用片段 ---------- */
 const topbar = (left, title, right) =>
   `<header class="top"><div>${left || ''}</div><h1 class="top-t">${title || ''}</h1><div class="top-r">${right || ''}</div></header>`;
-const backBtn = href => `<a class="icon-btn" href="${href}" aria-label="返回">${svg(P.back, 24)}</a>`;
+const backBtn = href => `<button class="icon-btn" data-act="back" data-to="${href}" aria-label="返回">${svg(P.back, 24)}</button>`;
 function photosOf(m) {
   if (m.photos && m.photos.length) return m.photos;
   return m.photo ? [m.photo] : [];
@@ -464,12 +466,15 @@ function viewHome() {
   const meds = [...state.meds.values()];
   const tiles = Object.entries(BOXES).map(([k, label]) => {
     const ms = meds.filter(m => m.box === k);
-    const alert = ms.filter(isAlert).length;
+    const bad = ms.filter(isBad).length;
+    const warn = ms.filter(isWarn).length;
     const sub = ms.length ? `${ms.length} 种药品` : '还没有药品，点进去添加';
+    const chips = (bad ? `<em class="chip bad">${bad} 种已过期</em>` : '') +
+      (warn ? `<em class="chip warn">${warn} 种快过期</em>` : '');
     return `<a class="tile" href="#/box/${k}">
       <div class="tile-ic">${svg(k === 'cat' ? P.cat : P.person, 30, 1.8)}</div>
       <div class="tile-b"><span class="tile-t">${label}</span>
-        <span class="tile-s">${sub}${alert ? `<em class="chip warn">${alert} 种快过期</em>` : ''}</span></div>
+        <span class="tile-s">${sub}${chips}</span></div>
       ${svg(P.chev, 20)}</a>`;
   }).join('');
   const soon = meds.filter(m => nearestExp(m)).sort(byExp).slice(0, 5);
@@ -501,12 +506,14 @@ function viewBox(box, kind, val) {
   const cnt = {
     all: all.length,
     opened: all.filter(m => openedQty(m) > 0).length,
-    soon: all.filter(isAlert).length
+    soon: all.filter(isWarn).length,
+    expired: all.filter(isBad).length
   };
   let list = all, title = BOXES[box];
   if (kind === 'tag') { list = all.filter(m => (m.tags || []).includes(val)); title = '#' + esc(val); }
   else if (kind === 'f' && val === 'opened') list = all.filter(m => openedQty(m) > 0);
-  else if (kind === 'f' && val === 'soon') list = all.filter(isAlert);
+  else if (kind === 'f' && val === 'soon') list = all.filter(isWarn);
+  else if (kind === 'f' && val === 'expired') list = all.filter(isBad);
   const q = state.search.trim().toLowerCase();
   if (q) list = list.filter(m => [m.name, m.spec, ...(m.tags || [])].join(' ').toLowerCase().includes(q));
   list = list.slice().sort(byExp);
@@ -517,7 +524,8 @@ function viewBox(box, kind, val) {
     ? `<a class="pill on" href="${base}" aria-label="清除分类筛选">#${esc(val)} ${svg(P.close, 14)}</a>`
     : pill(base, `全部 ${cnt.all}`, !kind) +
       pill(base + '/f/opened', `已开封 ${cnt.opened}`, val === 'opened') +
-      pill(base + '/f/soon', `快过期 ${cnt.soon}`, val === 'soon');
+      pill(base + '/f/soon', `快过期 ${cnt.soon}`, val === 'soon') +
+      (cnt.expired ? pill(base + '/f/expired', `已过期 ${cnt.expired}`, val === 'expired') : '');
   const search = state.searchOpen
     ? `<div class="searchbar"><input id="q" type="search" placeholder="搜索名称、规格、分类" value="${esc(state.search)}" autocomplete="off"></div>` : '';
   const rows = list.length ? list.map(medRow).join('')
@@ -539,7 +547,8 @@ function openDrawer(box) {
     <aside class="drawer" role="dialog" aria-label="菜单">
       <h2>${BOXES[box]}</h2>
       <a href="${base}">全部药品<span>${all.length}</span></a>
-      <a href="${base}/f/soon">快过期<span>${all.filter(isAlert).length}</span></a>
+      <a href="${base}/f/soon">快过期<span>${all.filter(isWarn).length}</span></a>
+      <a href="${base}/f/expired">已过期<span>${all.filter(isBad).length}</span></a>
       <a href="${base}/f/opened">已开封<span>${all.filter(m => openedQty(m) > 0).length}</span></a>
       <h3>分类</h3>
       ${tags.length ? tags.map(t => `<a href="${base}/tag/${encodeURIComponent(t)}">#${esc(t)}<span>${count[t]}</span></a>`).join('')
@@ -580,7 +589,8 @@ function viewMed(id) {
     return `<div class="batch">
       <div class="batch-h"><b>${dot(b.exp)} 到期</b><span class="${cls}">${bd < 0 ? `已过期 ${-bd} 天` : `${bd} 天`}</span></div>
       <div class="batch-m"><span>${b.qty} 件</span>${b.opened
-        ? `<span class="chip warn">${dot(b.opened)} 开封</span>` : '<span class="chip">未开封</span>'}</div>
+        ? `<button class="chip warn" data-act="open-date" data-id="${m.id}" data-bid="${b.id}">${dot(b.opened)} 开封</button>`
+        : '<span class="chip">未开封</span>'}</div>
       ${cal}</div>`;
   }).join('') : '<p class="empty" style="padding:24px 0">已经用完了，点「库存更新」可以入库</p>';
 
@@ -758,6 +768,37 @@ function addToCalendar(m, exp) {
 function goReplace(hash) {
   location.replace(location.pathname + location.search + hash);
 }
+let openEdit = null;
+function openDateSheet(id, bid) {
+  const m = state.meds.get(id);
+  if (!m) return;
+  const b = (m.batches || []).find(x => x.id === bid);
+  if (!b) return;
+  openEdit = { id, bid, date: b.opened || todayStr() };
+  showLayer(`<div class="scrim" data-act="close-open-date"></div>
+    <div class="sheet" role="dialog" aria-label="开封日期">
+      <h2 class="sheet-t">开封日期</h2>
+      <p>${dot(b.exp)} 到期这一批，${b.qty} 件</p>
+      <label class="line"><span>开封日期</span><input id="open-date" type="date" value="${openEdit.date}"></label>
+      <div class="actions2">
+        <button class="btn" data-act="open-date-clear">改为未开封</button>
+        <button class="btn primary" data-act="open-date-save">确认更改</button>
+      </div>
+    </div>`);
+}
+function setOpened(date) {
+  const m = clone(state.meds.get(openEdit.id));
+  const b = m.batches.find(x => x.id === openEdit.bid);
+  if (!b) { closeLayer(); return; }
+  b.opened = date || null;
+  const same = m.batches.find(x => x !== b && x.exp === b.exp && (x.opened || null) === (b.opened || null));
+  if (same) { same.qty += b.qty; b.qty = 0; }
+  tidy(m);
+  openEdit = null;
+  save(m);
+  closeLayer();
+  toast(date ? `开封日期改为 ${dot(date)}` : '已改为未开封');
+}
 function askCalendarList(m, exps) {
   showLayer(`<div class="scrim" data-act="close"></div>
     <div class="sheet menu-sheet" role="dialog" aria-label="日历提醒">
@@ -796,7 +837,7 @@ function viewForm(mode, arg) {
     .filter(t => !f.tags.includes(t)).sort((a, b) => a.localeCompare(b, 'zh'));
   const cancel = mode === 'add' ? '#/box/' + f.box : '#/med/' + f.id;
 
-  return topbar(`<a class="text-btn" href="${cancel}">取消</a>`, mode === 'add' ? '添加药品' : '编辑药品', '') +
+  return topbar(`<button class="text-btn" data-act="cancel-form" data-to="${cancel}">取消</button>`, mode === 'add' ? '添加药品' : '编辑药品', '') +
     `<main class="pad form">
       <input type="file" id="photo-in" accept="image/*" hidden>
       <div class="photos">
@@ -828,14 +869,13 @@ function viewForm(mode, arg) {
         ${mode === 'edit' || i > 0 ? `<div class="line"><span>第 ${i + 1} 批</span>
           <button class="link-btn" style="color:var(--bad)" data-act="f-row-del" data-i="${i}">删除</button></div>` : ''}
         <label class="line"><span>过期日期</span><input id="f-exp-${i}" data-fr="exp" data-i="${i}" type="date" value="${r.exp}"></label>
-        ${mode === 'edit' ? `<label class="line"><span>开封日期</span><input data-fr="opened" data-i="${i}" type="date" value="${r.opened || ''}"></label>` : ''}
         <div class="line"><span>数量</span><div class="stepper">
           <button data-act="f-qty" data-i="${i}" data-v="-1" aria-label="减少"${r.qty <= 1 ? ' disabled' : ''}>${svg(P.minus, 20, 2.2)}</button>
           <b class="num">${r.qty}</b>
           <button data-act="f-qty" data-i="${i}" data-v="1" aria-label="增加">${svg(P.plus, 20, 2.2)}</button></div></div>
       </div>`).join('')}
       <button class="btn wide" data-act="f-row-add">+ 再加一个过期日期</button>
-      <p class="hint">同一种药有不同的过期日期，就分开填。列表里只显示一条，数量是加起来的总数。${mode === 'edit' ? '开封日期留空就是未开封。' : ''}</p>
+      <p class="hint">同一种药有不同的过期日期，就分开填。列表里只显示一条，数量是加起来的总数。${mode === 'edit' ? '开封日期在详情页点那个橙色标签改。' : ''}</p>
 
       <div class="field-l">过期提醒</div>
       <div class="seg3">${REMIND_OPTIONS.map(n =>
@@ -881,7 +921,8 @@ function saveForm() {
     if (tooBig(m)) return;
     form = null;
     save(m);
-    goReplace('#/med/' + m.id);
+    if (cameFrom === '#/med/' + m.id) history.back();
+    else goReplace('#/med/' + m.id);
     toast('已保存');
     return;
   }
@@ -911,8 +952,10 @@ function delMed() {
   const m = state.meds.get(form.id);
   if (!m || !confirm(`删除「${m.name}」？删除后不能恢复。`)) return;
   state.meds.delete(m.id);
+  const from = cameFrom;
   form = null;
-  goReplace('#/box/' + m.box);
+  if (from === '#/med/' + m.id) history.go(-2);
+  else goReplace('#/box/' + m.box);
   Promise.resolve().then(() => store.del(m.id)).catch(e => toast('删除失败：' + e.message));
 }
 function tooBig(m) {
@@ -1241,6 +1284,10 @@ const actions = {
     if (m) addToCalendar(m, el.dataset.exp);
     if (el.closest('.sheet') && !el.dataset.keep) closeLayer();
   },
+  'open-date': el => openDateSheet(el.dataset.id, el.dataset.bid),
+  'open-date-save': () => setOpened(openEdit.date),
+  'open-date-clear': () => setOpened(null),
+  'close-open-date': () => { openEdit = null; closeLayer(); },
   'f-row-add': () => { form.rows.push({ exp: '', qty: 1 }); render(); },
   'f-row-del': el => { form.rows.splice(Number(el.dataset.i), 1); render(); },
   'pick-photo': () => {
@@ -1255,6 +1302,17 @@ const actions = {
     const r = form.rows[Number(el.dataset.i)];
     r.qty = Math.max(1, r.qty + Number(el.dataset.v));
     render();
+  },
+  back: el => {
+    const to = el.dataset.to;
+    if (cameFrom === to) history.back();
+    else goReplace(to);
+  },
+  'cancel-form': el => {
+    const to = el.dataset.to;
+    form = null;
+    if (cameFrom === to) history.back();
+    else goReplace(to);
   },
   'save-form': saveForm,
   'del-med': delMed,
@@ -1275,6 +1333,7 @@ document.addEventListener('click', e => {
 document.addEventListener('input', e => {
   const t = e.target;
   if (t.id === 'q') { state.search = t.value; render(); return; }
+  if (t.id === 'open-date' && openEdit) { openEdit.date = t.value; return; }
   if (t.dataset.in && sheet) { sheet[t.dataset.in] = t.value; return; }
   if (t.dataset.fr && form) {
     form.rows[Number(t.dataset.i)][t.dataset.fr] = t.value;
@@ -1324,7 +1383,11 @@ document.addEventListener('change', async e => {
     toast(`已改为过期前 ${m.remindDays} 天，记得重新加日历提醒`);
   }
 });
+let cameFrom = '';
+let lastHash = location.hash;
 window.addEventListener('hashchange', () => {
+  cameFrom = lastHash;
+  lastHash = location.hash;
   const r = route();
   if (r[0] !== 'add' && r[0] !== 'edit') form = null;
   state.search = '';
