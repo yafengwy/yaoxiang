@@ -212,6 +212,13 @@ button.tag{height:34px;padding:0 12px;font-size:14px;border-radius:10px;display:
 .cover-tag{position:absolute;left:0;right:0;bottom:0;background:rgba(0,0,0,.45);color:#fff;font-size:11px;padding:2px 0;text-align:center}
 .photo-add{width:92px;height:92px;border-radius:16px;border:1.5px dashed var(--line);background:var(--card);color:var(--muted);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-size:13px;padding:0}
 .photo-add svg{color:var(--accent)}
+.files{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+.fileline{display:flex;align-items:center;gap:6px;background:var(--card);border-radius:14px;padding:0 10px 0 14px}
+.fileopen{flex:1;min-width:0;display:flex;align-items:center;gap:10px;border:0;background:none;color:var(--ink);min-height:52px;padding:0;text-align:left}
+.fileopen svg{color:var(--accent);flex-shrink:0}
+.fname{flex:1;min-width:0;font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fsize{font-size:13px;color:var(--muted);flex-shrink:0}
+.row-s.accent-t{display:inline-flex;align-items:center;gap:4px}
 .strip{display:flex;gap:8px;overflow-x:auto;padding:0 20px 12px;scrollbar-width:none}
 .strip::-webkit-scrollbar{display:none}
 .strip button{width:64px;height:64px;border-radius:14px;overflow:hidden;border:0;padding:0;flex-shrink:0;background:var(--ph)}
@@ -224,6 +231,7 @@ button.tag{height:34px;padding:0 12px;font-size:14px;border-radius:10px;display:
 .crop-tools{display:flex;align-items:center;gap:10px}
 .crop-tools input[type=range]{flex:1;accent-color:var(--accent)}
 .viewer-x{position:absolute;top:calc(env(safe-area-inset-top) + 8px);right:12px;color:#fff;background:rgba(255,255,255,.2);border-radius:22px}
+.viewer-more{position:absolute;right:16px;bottom:calc(env(safe-area-inset-bottom) + 24px);color:#fff;background:rgba(255,255,255,.2);border-radius:24px;width:48px;height:48px}
 .viewer-nav{position:absolute;left:0;right:0;bottom:calc(env(safe-area-inset-bottom) + 24px);display:flex;align-items:center;justify-content:center;gap:20px;color:#fff;font-size:15px}
 .viewer-nav button{width:48px;height:48px;border-radius:24px;border:0;background:rgba(255,255,255,.2);color:#fff;display:flex;align-items:center;justify-content:center}
 .menu-sheet button{width:100%;min-height:54px;border:0;border-bottom:1px solid var(--line);background:none;font-size:17px;text-align:left;padding:0}
@@ -335,7 +343,7 @@ const BOXES = { cat: '猫用药', human: '人用药' };
 const REMIND_OPTIONS = [30, 60, 120];
 const LOG_TEXT = { add: '添加', in: '入库', use: '用完', open: '开封' };
 const FB_VER = '10.12.2';
-const APP_VER = '2026.09.17-30';
+const APP_VER = '2026.09.17-32';
 const MAX_PHOTOS = 6;
 const PHOTO_PX = 640;
 const PHOTO_Q = 0.62;
@@ -393,6 +401,8 @@ const P = {
   bottle: '<rect x="7" y="8" width="10" height="13" rx="2"/><path d="M9 8V5h6v3M10 14h4"/>',
   camera: '<path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/>',
   check: '<path d="M5 12l5 5 9-10"/>',
+  more: '<path d="M6 12h.01M12 12h.01M18 12h.01"/>',
+  file: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/>',
   down: '<path d="M6 9l6 6 6-6"/>',
   vaccine: '<path d="M18 2l4 4"/><path d="M15.5 4.5l4 4"/><path d="M13 7l4 4-8 8H5v-4z"/><path d="M11 9l2 2"/>',
   visit: '<path d="M4 21V9.5L12 4l8 5.5V21z"/><path d="M12 11v6M9 14h6"/>',
@@ -437,10 +447,10 @@ const LocalStore = {
   db: null,
   async init() {
     this.db = await new Promise((res, rej) => {
-      const r = indexedDB.open('yaoxiang', 2);
+      const r = indexedDB.open('yaoxiang', 3);
       r.onupgradeneeded = () => {
         const db = r.result;
-        COLS.forEach(c => { if (!db.objectStoreNames.contains(c)) db.createObjectStore(c, { keyPath: 'id' }); });
+        COLS.concat(['files']).forEach(c => { if (!db.objectStoreNames.contains(c)) db.createObjectStore(c, { keyPath: 'id' }); });
       };
       r.onsuccess = () => res(r.result);
       r.onerror = () => rej(r.error);
@@ -462,7 +472,17 @@ const LocalStore = {
     });
   },
   put(col, d) { return this.tx(col, 'readwrite', st => st.put(d)); },
-  del(col, id) { return this.tx(col, 'readwrite', st => st.delete(id)); }
+  del(col, id) { return this.tx(col, 'readwrite', st => st.delete(id)); },
+  putPart(d) { return this.tx('files', 'readwrite', st => st.put(d)); },
+  async partsOf(fileId) {
+    const all = await this.tx('files', 'readonly', st => st.getAll());
+    return (all || []).filter(x => x.fileId === fileId);
+  },
+  async delFile(fileId) {
+    const all = await this.tx('files', 'readonly', st => st.getAll());
+    const mine = (all || []).filter(x => x.fileId === fileId);
+    for (const x of mine) await this.tx('files', 'readwrite', st => st.delete(x.id));
+  }
 };
 
 /* ---------- 存储：Firebase 云端 ---------- */
@@ -510,7 +530,16 @@ const CloudStore = {
   col(c) { return this.fs.collection('users').doc(this.uid).collection(c); },
   put(c, d) { return this.col(c).doc(d.id).set(clone(d)); },
   del(c, id) { return this.col(c).doc(id).delete(); },
-  logout() { return this.auth.signOut(); }
+  logout() { return this.auth.signOut(); },
+  putPart(d) { return this.col('files').doc(d.id).set(d); },
+  async partsOf(fileId) {
+    const snap = await this.col('files').where('fileId', '==', fileId).get();
+    return snap.docs.map(d => d.data());
+  },
+  async delFile(fileId) {
+    const snap = await this.col('files').where('fileId', '==', fileId).get();
+    for (const d of snap.docs) await d.ref.delete();
+  }
 };
 
 function saveDoc(col, d) {
@@ -987,7 +1016,7 @@ function viewForm(mode, arg) {
     `<main class="pad form">
       <input type="file" id="photo-in" accept="image/*" hidden>
       <div class="photos">
-        ${f.photos.map((p, i) => `<button class="photo-thumb" data-act="photo-menu" data-i="${i}" aria-label="第 ${i + 1} 张照片">
+        ${f.photos.map((p, i) => `<button class="photo-thumb" data-act="photo-open" data-i="${i}" aria-label="第 ${i + 1} 张照片">
           <img src="${esc(p)}" alt="">${i === 0 ? '<span class="cover-tag">封面</span>' : ''}</button>`).join('')}
         ${f.photos.length < MAX_PHOTOS
           ? `<button class="photo-add" data-act="pick-photo">${svg(P.camera, 24, 1.8)}<span>加照片</span></button>` : ''}
@@ -1111,8 +1140,8 @@ let viewer = null;
 let cropper = null;
 let photoPending = null;
 
-function openViewer(photos, i) {
-  viewer = { photos, i: Math.max(0, Math.min(i || 0, photos.length - 1)) };
+function openViewer(photos, i, menuAct) {
+  viewer = { photos, i: Math.max(0, Math.min(i || 0, photos.length - 1)), menu: menuAct || '' };
   renderViewer();
 }
 function renderViewer() {
@@ -1121,6 +1150,7 @@ function renderViewer() {
     <div class="viewer">
       <img src="${esc(photos[i])}" alt="">
       <button class="icon-btn viewer-x" data-act="close" aria-label="关闭">${svg(P.close)}</button>
+      ${viewer.menu ? `<button class="icon-btn viewer-more" data-act="${viewer.menu}" data-i="${i}" aria-label="这张照片的操作">${svg(P.more, 22, 3)}</button>` : ''}
       ${photos.length > 1 ? `<div class="viewer-nav">
         <button data-act="v-step" data-v="-1" aria-label="上一张">${svg(P.back, 24)}</button>
         <span>${i + 1} / ${photos.length}</span>
@@ -1229,6 +1259,66 @@ function cropDone() {
   cropper = null;
   closeLayer();
   done(data);
+}
+const MAX_FILE = 12 * 1024 * 1024;
+const CHUNK = 600000;
+function sizeText(n) {
+  return n >= 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB';
+}
+async function uploadFile(file, onDone) {
+  if (file.size > MAX_FILE) { toast('文件太大了，最多 12 MB'); return; }
+  toast('正在上传…');
+  const b64 = await new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => res(String(r.result).split(',')[1] || '');
+    r.onerror = rej;
+    r.readAsDataURL(file);
+  });
+  const fileId = uid();
+  const of = Math.ceil(b64.length / CHUNK);
+  try {
+    for (let i = 0; i < of; i++) {
+      await store.putPart({ id: `${fileId}_${i}`, fileId, part: i, of, data: b64.slice(i * CHUNK, (i + 1) * CHUNK) });
+    }
+  } catch (e) {
+    toast('上传失败：' + e.message);
+    return;
+  }
+  onDone({ id: fileId, name: file.name, mime: file.type || 'application/pdf', size: file.size });
+  toast('已上传');
+}
+async function openFile(meta) {
+  try {
+    toast('正在打开…');
+    const parts = await store.partsOf(meta.id);
+    if (!parts.length) { toast('文件没找到'); return; }
+    parts.sort((a, b) => a.part - b.part);
+    const b64 = parts.map(p => p.data).join('');
+    const bin = atob(b64);
+    const arr = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+    const url = URL.createObjectURL(new Blob([arr], { type: meta.mime || 'application/pdf' }));
+    const a = document.createElement('a');
+    a.href = url;
+    a.target = '_blank';
+    a.rel = 'noopener';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 120000);
+  } catch (e) {
+    toast('打开失败：' + e.message);
+  }
+}
+function filesHtml(list, act) {
+  return (list || []).map((f, i) => `<div class="fileline">
+    <button class="fileopen" data-act="${act}-open" data-i="${i}">
+      ${svg(P.file, 20, 1.8)}
+      <span class="fname">${esc(f.name)}</span>
+      <span class="fsize">${sizeText(f.size || 0)}</span>
+    </button>
+    <button class="icon-btn small" data-act="${act}-del" data-i="${i}" aria-label="删掉这个文件">${svg(P.close, 16)}</button>
+  </div>`).join('');
 }
 function openPhotoMenu(i) {
   showLayer(`<div class="scrim" data-act="close"></div>
@@ -1743,6 +1833,7 @@ function logRow(l) {
       <b>${dot(l.date).slice(5)} ${logTitle(l)}${l.healed ? '<span class="healed">已痊愈</span>' : ''}</b>
       ${sum ? `<span class="row-s">${esc(sum)}</span>` : ''}
       ${l.note ? `<span class="row-s">${esc(l.note)}</span>` : ''}
+      ${(l.files || []).length ? `<span class="row-s accent-t">${svg(P.file, 13, 1.8)} ${l.files.length} 个文件</span>` : ''}
     </div>
     ${(l.photos || []).length ? `<img class="log-th" src="${esc(l.photos[0])}" alt="">` : ''}
   </a>`;
@@ -1754,7 +1845,11 @@ function viewMember(id) {
   const anchor = state.cal || todayStr();
   const filter = state.symFilter;
   const range = calRange(anchor, state.calView);
-  const symIds = [...new Set(logs.map(logKey))];
+  const symIds = [...new Set(logs.map(logKey))]
+    .sort((a, b) => {
+      const rank = k => (k === 'vaccine' ? 2 : k === 'visit' ? 1 : 0);
+      return rank(a) - rank(b);
+    });
   const rb = rangeBounds();
   const counts = {};
   symIds.forEach(k => {
@@ -1889,13 +1984,13 @@ function viewLog(mode, arg) {
       if (!state.members.get(arg)) return notFound();
       const first = [...state.symptoms.values()][0];
       lf = { key, kind: 'symptom', memberId: arg, symptomId: first ? first.id : '',
-        date: state.calDay || todayStr(), values: {}, photos: [], note: '', healed: false,
+        date: state.calDay || todayStr(), values: {}, photos: [], files: [], note: '', healed: false,
         vacName: '', years: 1, remindDays: 60, place: '' };
     } else {
       const l = state.logs.get(arg);
       if (!l) return notFound();
       lf = { key, id: l.id, kind: kindOf(l), memberId: l.memberId, symptomId: l.symptomId, date: l.date,
-        values: clone(l.values || {}), photos: (l.photos || []).slice(), note: l.note || '',
+        values: clone(l.values || {}), photos: (l.photos || []).slice(), files: clone(l.files || []), note: l.note || '',
         healed: !!l.healed, vacName: l.vacName || '', years: l.years || 1,
         remindDays: l.remindDays || 60, place: l.place || '', createdAt: l.createdAt };
     }
@@ -1949,15 +2044,16 @@ function viewLog(mode, arg) {
 
 
   const photos = `<div class="photos">
-    ${lf.photos.map((p, i) => `<button class="photo-thumb" data-act="lphoto-menu" data-i="${i}" aria-label="第 ${i + 1} 张照片"><img src="${esc(p)}" alt=""></button>`).join('')}
-    ${lf.photos.length < 3 ? `<button class="photo-add" data-act="pick-lphoto">${svg(P.camera, 24, 1.8)}<span>加照片</span></button>` : ''}
-  </div>`;
+    ${lf.photos.map((p, i) => `<button class="photo-thumb" data-act="lphoto-open" data-i="${i}" aria-label="第 ${i + 1} 张照片"><img src="${esc(p)}" alt=""></button>`).join('')}
+    ${lf.photos.length < 3 ? `<button class="photo-add" data-act="pick-lphoto">${svg(P.camera, 24, 1.8)}<span>照片 / 文件</span></button>` : ''}
+  </div>
+  ${lf.files.length ? `<div class="files">${filesHtml(lf.files, 'lfile')}</div>` : ''}`;
 
   const cancel = '#/member/' + lf.memberId;
   return topbar(`<button class="text-btn" data-act="cancel-log" data-to="${cancel}">取消</button>`,
       `${esc(me.name)} · ${mode === 'new' ? '添加记录' : LOG_KINDS[lf.kind] + '记录'}`, '') +
     `<main class="pad form" style="padding-bottom:40px">
-      <input type="file" id="lphoto-in" accept="image/*" hidden>
+      <input type="file" id="lphoto-in" accept="image/*,application/pdf,.pdf" hidden>
       ${kindSeg}
       <div class="card">
         <label class="line"><span>日期</span><input data-lf="date" type="date" value="${lf.date}"></label>
@@ -1976,8 +2072,9 @@ function viewLog(mode, arg) {
         : lf.kind === 'vaccine' ? vacBody : visitBody}
       <div class="field-l">备注</div>
       <textarea id="lf-note" class="note-input" data-lf="note" rows="3" placeholder="随便写点什么">${esc(lf.note)}</textarea>
-      <div class="field-l">照片</div>
+      <div class="field-l">照片和文件</div>
       ${photos}
+      <p class="hint">照片最多 3 张；PDF 之类的文件直接存原件，最多 12 MB 一个</p>
       <button class="btn primary wide" data-act="save-log">保存</button>
       ${lf.id ? '<button class="btn danger wide" data-act="del-log">删除这条记录</button>' : ''}
     </main>`;
@@ -1988,7 +2085,7 @@ function saveLog() {
   if (k === 'vaccine' && !lf.vacName) { toast('先填疫苗名字'); return; }
   const l = {
     id: lf.id || uid(), kind: k, memberId: lf.memberId,
-    date: lf.date || todayStr(), photos: lf.photos, note: lf.note.trim(),
+    date: lf.date || todayStr(), photos: lf.photos, files: lf.files, note: lf.note.trim(),
     createdAt: lf.createdAt || todayStr()
   };
   if (k === 'symptom') {
@@ -2050,6 +2147,7 @@ function delLog() {
   if (!confirm('删除这条记录？')) return;
   const to = '#/member/' + lf.memberId;
   const id = lf.id;
+  (lf.files || []).forEach(f => { Promise.resolve().then(() => store.delFile(f.id)).catch(() => {}); });
   const from = cameFrom;
   lf = null;
   delDoc('logs', id);
@@ -2215,6 +2313,18 @@ const actions = {
   'crop-zoom': el => cropZoom(Number(el.dataset.v)),
   'crop-done': cropDone,
   'close-crop': () => { if (cropper && cropper.onClose) cropper.onClose(); cropper = null; closeLayer(); },
+  'lfile-open': el => openFile(lf.files[Number(el.dataset.i)]),
+  'lfile-del': el => {
+    const i = Number(el.dataset.i);
+    const f = lf.files[i];
+    if (!confirm(`删掉「${f.name}」？`)) return;
+    lf.files.splice(i, 1);
+    Promise.resolve().then(() => store.delFile(f.id)).catch(() => {});
+    render();
+  },
+  'photo-open': el => openViewer(form.photos, Number(el.dataset.i), 'photo-menu'),
+  'lphoto-open': el => openViewer(lf.photos, Number(el.dataset.i), 'lphoto-open-menu'),
+  'lphoto-open-menu': el => { const i = Number(el.dataset.i); viewer = null; actions['lphoto-menu']({ dataset: { i } }); },
   'photo-menu': el => openPhotoMenu(Number(el.dataset.i)),
   'ph-edit': el => {
     const i = Number(el.dataset.i);
@@ -2527,7 +2637,14 @@ document.addEventListener('keydown', e => {
 document.addEventListener('change', async e => {
   const t = e.target;
   if ((t.id === 'photo-in' || t.id === 'mphoto-in' || t.id === 'lphoto-in') && t.files && t.files[0]) {
-    const url = URL.createObjectURL(t.files[0]);
+    const picked = t.files[0];
+    if (!/^image\//.test(picked.type)) {
+      t.value = '';
+      if (t.id !== 'lphoto-in' || !lf) { toast('这里只能放照片'); return; }
+      uploadFile(picked, meta => { if (lf) { lf.files.push(meta); render(); } });
+      return;
+    }
+    const url = URL.createObjectURL(picked);
     const pending = photoPending || { mode: 'add' };
     const done = data => {
       photoPending = null;
