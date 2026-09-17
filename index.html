@@ -213,6 +213,8 @@ button.tag{height:34px;padding:0 12px;font-size:14px;border-radius:10px;display:
 .menu-sheet button{width:100%;min-height:54px;border:0;border-bottom:1px solid var(--line);background:none;font-size:17px;text-align:left;padding:0}
 .menu-sheet button:last-child{border-bottom:0;color:var(--muted)}
 .menu-sheet .danger{color:var(--bad)}
+#pull{position:fixed;top:0;left:0;right:0;height:56px;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:14px;z-index:6;pointer-events:none;transform:translateY(-56px);transition:transform .2s ease-out;padding-top:env(safe-area-inset-top)}
+#pull.drag{transition:none}
 .login{padding-top:calc(env(safe-area-inset-top) + 60px)}
 .login .card{margin-top:24px}
 .login .text-btn{display:flex;margin:12px auto 0}
@@ -220,6 +222,7 @@ button.tag{height:34px;padding:0 12px;font-size:14px;border-radius:10px;display:
 </head>
 <body>
 <div id="app"></div>
+<div id="pull" aria-hidden="true"><span id="pull-t">下拉刷新</span></div>
 <div id="layer"></div>
 <div id="toast" role="status" aria-live="polite"></div>
 <script>
@@ -250,6 +253,7 @@ const BOXES = { human: '人用药', cat: '猫用药' };
 const REMIND_OPTIONS = [30, 60, 120];
 const LOG_TEXT = { add: '添加', in: '入库', use: '用完', open: '开封' };
 const FB_VER = '10.12.2';
+const APP_VER = '2026.09.17-9';
 const MAX_PHOTOS = 6;
 const PHOTO_PX = 640;
 const PHOTO_Q = 0.62;
@@ -648,13 +652,16 @@ function renderSheet() {
   const sel = bs.find(b => b.id === s.batchId);
   const max = s.mode === 'out' ? (sel ? sel.qty : 1) : 999;
   s.n = Math.min(Math.max(1, s.n), max);
-  const after = s.mode === 'out' ? tot - s.n : tot + s.n;
+  const inTarget = bs.find(b => b.exp === s.exp && !b.opened);
+  const base = s.mode === 'out' ? (sel ? sel.qty : 0) : (inTarget ? inTarget.qty : 0);
+  const after = s.mode === 'out' ? base - s.n : base + s.n;
+  const showDate = s.mode === 'out' && sel && !sel.opened;
 
   const stepper = `<div class="line"><span>数量</span><div class="stepper">
     <button data-act="n" data-v="-1" aria-label="减少"${s.n <= 1 ? ' disabled' : ''}>${svg(P.minus, 20, 2.2)}</button>
     <b class="num">${s.n}</b>
     <button data-act="n" data-v="1" aria-label="增加"${s.n >= max ? ' disabled' : ''}>${svg(P.plus, 20, 2.2)}</button></div></div>`;
-  const dateRow = `<label class="line"><span>日期</span><input type="date" data-in="date" value="${s.date}"></label>`;
+  const dateRow = showDate ? `<label class="line"><span>开封日期</span><input type="date" data-in="date" value="${s.date}"></label>` : '';
   const noteRow = `<label class="line"><span>备注</span><input type="text" data-in="note" placeholder="添加说明（可选）" value="${esc(s.note)}"></label>`;
 
   let body;
@@ -667,7 +674,7 @@ function renderSheet() {
         <button class="btn" data-act="do-use">用完</button>
         <button class="btn primary" data-act="do-open"${sel && !sel.opened ? '' : ' disabled'}>开封</button>
       </div>
-      <p class="hint">${sel && sel.opened ? '这一批已经开封了' : '点「开封」时，上面的日期就是开封日期，可以改成前几天；开封不会减少数量'}</p>`;
+      <p class="hint">${sel && sel.opened ? '这一批已经开封了，点「用完」会减少数量' : '「开封」记录开封日期，不减少数量；「用完」减少数量'}</p>`;
   } else {
     const exps = [...new Set(bs.map(b => b.exp))];
     body = `<label class="line"><span>过期日期</span><input type="date" data-in="exp" value="${s.exp}"></label>
@@ -682,7 +689,7 @@ function renderSheet() {
           <button data-act="mode" data-v="out" class="${s.mode === 'out' ? 'on' : ''}"${bs.length ? '' : ' disabled'}>出库</button>
           <button data-act="mode" data-v="in" class="${s.mode === 'in' ? 'on' : ''}">入库</button>
         </div>
-        <div class="change num">${tot}${svg(P.arrow, 18)}<span class="${s.mode === 'out' ? 'st-bad' : 'st-ok'}">${after}</span></div>
+        <div class="change num">${base}${svg(P.arrow, 18)}<span class="${s.mode === 'out' ? 'st-bad' : 'st-ok'}">${after}</span></div>
         <button class="icon-btn" data-act="close" aria-label="关闭">${svg(P.close)}</button>
       </div>${body}</div>`);
 }
@@ -692,7 +699,7 @@ function doUse() {
   if (!b) return;
   const n = Math.min(s.n, b.qty);
   b.qty -= n;
-  addLog(m, 'use', b.exp, n, s.date, s.note);
+  addLog(m, 'use', b.exp, n, b.opened ? todayStr() : (s.date || todayStr()), s.note);
   tidy(m);
   save(m);
   closeLayer();
@@ -722,7 +729,7 @@ function doIn() {
   const t = m.batches.find(x => x.exp === s.exp && !x.opened);
   if (t) t.qty += s.n;
   else m.batches.push({ id: uid(), exp: s.exp, qty: s.n, opened: null });
-  addLog(m, 'in', s.exp, s.n, s.date, s.note);
+  addLog(m, 'in', s.exp, s.n, todayStr(), s.note);
   save(m);
   toast(`已入库 ${s.n} 件`);
   if (isNew && daysUntil(addDays(s.exp, -m.remindDays)) >= 0) askCalendar(m, s.exp);
@@ -1114,7 +1121,7 @@ function viewSettings() {
       <button class="line btn-line" data-act="import">导入备份</button>
     </div>
     <input type="file" id="import-in" accept="application/json,.json" hidden>
-    <p class="foot">共 ${state.meds.size} 种药品</p>
+    <p class="foot">共 ${state.meds.size} 种药品<br>版本 ${APP_VER}</p>
   </main>`;
 }
 function viewLogin() {
@@ -1398,6 +1405,45 @@ window.addEventListener('hashchange', () => {
 });
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible' && state.ready && !form) render();
+});
+
+/* ---------- 下拉刷新（首页和药箱列表） ---------- */
+const $pull = document.getElementById('pull');
+const $pullT = document.getElementById('pull-t');
+let pull = null;
+function setPull(d) {
+  $pull.classList.toggle('drag', d > 0);
+  $pull.style.transform = `translateY(${d - 56}px)`;
+  $pullT.textContent = d >= 60 ? '松开刷新' : '下拉刷新';
+}
+function canPull() {
+  const r = route()[0];
+  return (!r || r === 'box') && !$layer.classList.contains('open') && window.scrollY <= 0;
+}
+document.addEventListener('touchstart', e => {
+  pull = (e.touches.length === 1 && canPull()) ? { y0: e.touches[0].clientY, d: 0 } : null;
+}, { passive: true });
+document.addEventListener('touchmove', e => {
+  if (!pull) return;
+  const dy = e.touches[0].clientY - pull.y0;
+  if (dy <= 0 || window.scrollY > 0) { pull.d = 0; setPull(0); return; }
+  e.preventDefault();
+  pull.d = Math.min(dy * 0.5, 90);
+  setPull(pull.d);
+}, { passive: false });
+document.addEventListener('touchend', () => {
+  if (!pull) return;
+  const d = pull.d;
+  pull = null;
+  if (d >= 60) {
+    $pull.classList.remove('drag');
+    $pull.style.transform = 'translateY(0)';
+    $pullT.textContent = '正在刷新…';
+    setTimeout(() => location.reload(), 200);
+  } else {
+    $pull.classList.remove('drag');
+    setPull(0);
+  }
 });
 
 async function init() {
