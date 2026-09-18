@@ -364,7 +364,7 @@ const BOXES = { cat: '猫用药', human: '人用药' };
 const REMIND_OPTIONS = [30, 60, 120];
 const LOG_TEXT = { add: '添加', in: '入库', use: '用完', open: '开封' };
 const FB_VER = '10.12.2';
-const APP_VER = '2026.09.17-44';
+const APP_VER = '2026.09.17-45';
 const MAX_PHOTOS = 6;
 const PHOTO_PX = 640;
 const PHOTO_Q = 0.62;
@@ -1168,8 +1168,8 @@ function openViewer(photos, i, menuAct) {
 function renderViewer() {
   const { photos, i } = viewer;
   showLayer(`<div class="scrim" data-act="close"></div>
-    <div class="viewer">
-      <img src="${esc(photos[i])}" alt="">
+    <div class="viewer" data-act="close">
+      <img data-act="noop" src="${esc(photos[i])}" alt="">
       <button class="icon-btn viewer-x" data-act="close" aria-label="关闭">${svg(P.close)}</button>
       ${viewer.menu ? `<button class="icon-btn viewer-more" data-act="${viewer.menu}" data-i="${i}" aria-label="这张照片的操作">${svg(P.more, 22, 3)}</button>` : ''}
       ${photos.length > 1 ? `<div class="viewer-nav">
@@ -1918,6 +1918,7 @@ function logsHtml(list) {
   });
   return groups.map(g => {
     if (!g.key || g.rows.length < 2) return logRow(g.rows[0]);
+    g.rows = g.rows.slice().sort((a, b) => a.date.localeCompare(b.date));
     const open = state.epOpen[g.key] === undefined ? g.key === newest : state.epOpen[g.key];
     return episodeBlock(g.key, g.rows, open);
   }).join('');
@@ -2385,6 +2386,7 @@ function render() {
 
 const actions = {
   close: () => closeLayer(),
+  noop: () => {},
   drawer: el => openDrawer(el.dataset.box),
   search: () => {
     state.searchOpen = !state.searchOpen;
