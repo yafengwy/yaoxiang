@@ -1,6 +1,6 @@
 {
-  "name": "健康管理",
-  "short_name": "健康管理",
+  "name": "健康簿",
+  "short_name": "健康簿",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
