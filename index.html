@@ -285,6 +285,8 @@ button.tag{height:34px;padding:0 12px;font-size:14px;border-radius:10px;display:
 .cal-cell.on{background:var(--accent-soft)}
 .logs{display:flex;flex-direction:column;gap:10px}
 .log-row{display:flex;gap:12px;align-items:flex-start;background:var(--card);border-radius:18px;padding:14px 16px;color:var(--ink)}
+.log-main{flex:1;min-width:0;display:flex;gap:12px;align-items:flex-start;color:var(--ink)}
+.log-th-btn{border:0;background:none;padding:0;flex-shrink:0;line-height:0}
 .log-row .dot{width:9px;height:9px;border-radius:5px;margin-top:7px;flex-shrink:0}
 .ep{display:flex;flex-direction:column;gap:8px}
 .ep-head{width:100%;display:flex;align-items:center;gap:12px;background:var(--card);border:0;border-radius:18px;padding:14px 16px;text-align:left;color:var(--ink)}
@@ -362,7 +364,7 @@ const BOXES = { cat: '猫用药', human: '人用药' };
 const REMIND_OPTIONS = [30, 60, 120];
 const LOG_TEXT = { add: '添加', in: '入库', use: '用完', open: '开封' };
 const FB_VER = '10.12.2';
-const APP_VER = '2026.09.17-43';
+const APP_VER = '2026.09.17-44';
 const MAX_PHOTOS = 6;
 const PHOTO_PX = 640;
 const PHOTO_Q = 0.62;
@@ -1862,16 +1864,18 @@ function logRow(l, inEp) {
   const mark = inEp ? '' : (k === 'symptom'
     ? `<i class="dot" style="background:${color}"></i>`
     : `<span class="kicon" style="color:${color}">${svg(k === 'vaccine' ? P.vaccine : P.visit, 18, 1.8)}</span>`);
-  return `<a class="log-row${inEp ? ' in-ep' : ''}" href="#/log/${l.id}">
-    ${mark}
-    <div class="log-b">
-      <b>${dot(l.date).slice(5)}${inEp ? '' : ' ' + logTitle(l)}${l.healed ? '<span class="healed">已痊愈</span>' : ''}</b>
-      ${parts.map(p => `<span class="row-s"><b>${esc(p.label)}</b> ${esc(p.value)}</span>`).join('')}
-      ${l.note ? `<span class="row-note">${esc(l.note)}</span>` : ''}
-      ${(l.files || []).length ? `<span class="row-s accent-t">${svg(P.file, 13, 1.8)} ${l.files.length} 个文件</span>` : ''}
-    </div>
-    ${(l.photos || []).length ? `<img class="log-th" src="${esc(l.photos[0])}" alt="">` : ''}
-  </a>`;
+  return `<div class="log-row${inEp ? ' in-ep' : ''}">
+    <a class="log-main" href="#/log/${l.id}">
+      ${mark}
+      <div class="log-b">
+        <b>${dot(l.date).slice(5)}${inEp ? '' : ' ' + logTitle(l)}${l.healed ? '<span class="healed">已痊愈</span>' : ''}</b>
+        ${parts.map(p => `<span class="row-s"><b>${esc(p.label)}</b> ${esc(p.value)}</span>`).join('')}
+        ${l.note ? `<span class="row-note">${esc(l.note)}</span>` : ''}
+        ${(l.files || []).length ? `<span class="row-s accent-t">${svg(P.file, 13, 1.8)} ${l.files.length} 个文件</span>` : ''}
+      </div>
+    </a>
+    ${(l.photos || []).length ? `<button class="log-th-btn" data-act="log-photo" data-id="${l.id}" aria-label="看照片"><img class="log-th" src="${esc(l.photos[0])}" alt=""></button>` : ''}
+  </div>`;
 }
 function episodeBlock(key, grp, open) {
   const first = grp[0].date <= grp[grp.length - 1].date ? grp[0] : grp[grp.length - 1];
@@ -2409,6 +2413,10 @@ const actions = {
     lf.files.splice(i, 1);
     Promise.resolve().then(() => store.delFile(f.id)).catch(() => {});
     render();
+  },
+  'log-photo': el => {
+    const l = state.logs.get(el.dataset.id);
+    if (l && (l.photos || []).length) openViewer(l.photos, 0);
   },
   'photo-open': el => openViewer(form.photos, Number(el.dataset.i), 'photo-menu'),
   'lphoto-open': el => openViewer(lf.photos, Number(el.dataset.i), 'lphoto-open-menu'),
