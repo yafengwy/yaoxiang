@@ -102,6 +102,11 @@ button:disabled{opacity:.4;cursor:default}
 .row-t b{font-size:17px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .row-t small{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .row-s{font-size:13px;color:var(--muted)}
+.row-s b{color:var(--ink);font-weight:600;margin-right:2px}
+.row-note{font-size:13px;color:var(--muted);line-height:1.5;padding-top:2px}
+.st-chip{font-style:normal;font-size:12px;font-weight:600;padding:1px 8px;border-radius:999px;margin-left:8px}
+.st-chip.ok{color:var(--accent);background:var(--accent-soft)}
+.st-chip.no{color:var(--warn);background:var(--warn-soft)}
 .row-s .qty{font-size:16px;font-weight:700;color:var(--ink)}
 .row-s .warn-t .qty{color:var(--warn)}
 .tags{display:flex;flex-wrap:wrap;gap:4px}
@@ -354,7 +359,7 @@ const BOXES = { cat: '猫用药', human: '人用药' };
 const REMIND_OPTIONS = [30, 60, 120];
 const LOG_TEXT = { add: '添加', in: '入库', use: '用完', open: '开封' };
 const FB_VER = '10.12.2';
-const APP_VER = '2026.09.17-37';
+const APP_VER = '2026.09.17-38';
 const MAX_PHOTOS = 6;
 const PHOTO_PX = 640;
 const PHOTO_Q = 0.62;
@@ -1596,21 +1601,24 @@ function logColor(l) {
   const k = kindOf(l);
   return k === 'vaccine' ? VAC_COLOR : k === 'visit' ? VISIT_COLOR : symColor(l.symptomId);
 }
-function summaryOf(l) {
+function summaryParts(l) {
   if (kindOf(l) === 'vaccine') {
     const due = vacDue(l);
-    return due ? `${l.years} 年有效，${dot(due)} 到期` : '';
+    return due ? [{ label: '有效期', value: `${l.years} 年，${dot(due)} 到期` }] : [];
   }
-  if (kindOf(l) === 'visit') return '';
+  if (kindOf(l) === 'visit') return [];
   const s = symOf(l.symptomId);
-  if (!s) return '';
-  const parts = [];
+  if (!s) return [];
+  const out = [];
   (s.sections || []).forEach(sec => {
     const v = (l.values || {})[sec.id];
     if (v == null || v === '' || v === 0 || (Array.isArray(v) && !v.length)) return;
-    parts.push(`${sec.name}：${Array.isArray(v) ? v.join('、') : v}`);
+    out.push({ label: sec.name, value: Array.isArray(v) ? v.join('、') : String(v) });
   });
-  return parts.join('　');
+  return out;
+}
+function summaryOf(l) {
+  return summaryParts(l).map(p => `${p.label}：${p.value}`).join('　');
 }
 function avatarHtml(m, cls) {
   return m.photo
@@ -1845,7 +1853,7 @@ function calHtml(id, anchor, view, filter) {
   </div>`;
 }
 function logRow(l, inEp) {
-  const sum = summaryOf(l);
+  const parts = summaryParts(l);
   const k = kindOf(l);
   const color = logColor(l);
   const mark = inEp ? '' : (k === 'symptom'
@@ -1855,8 +1863,8 @@ function logRow(l, inEp) {
     ${mark}
     <div class="log-b">
       <b>${dot(l.date).slice(5)}${inEp ? '' : ' ' + logTitle(l)}${l.healed ? '<span class="healed">已痊愈</span>' : ''}</b>
-      ${sum ? `<span class="row-s">${esc(sum)}</span>` : ''}
-      ${l.note ? `<span class="row-s">${esc(l.note)}</span>` : ''}
+      ${parts.map(p => `<span class="row-s"><b>${esc(p.label)}</b> ${esc(p.value)}</span>`).join('')}
+      ${l.note ? `<span class="row-note">${esc(l.note)}</span>` : ''}
       ${(l.files || []).length ? `<span class="row-s accent-t">${svg(P.file, 13, 1.8)} ${l.files.length} 个文件</span>` : ''}
     </div>
     ${(l.photos || []).length ? `<img class="log-th" src="${esc(l.photos[0])}" alt="">` : ''}
@@ -1876,7 +1884,7 @@ function episodeBlock(key, grp, open) {
       <span class="dot" style="background:${color};${done ? 'opacity:.5' : ''}"></span>
       <div class="ep-b">
         <b>${esc(symName(first.symptomId))} ${span}</b>
-        <span>${grp.length} 条记录 · ${days} 天${done ? '，已痊愈' : '，还没好'}</span>
+        <span>${grp.length} 条记录 · ${days} 天<em class="st-chip ${done ? 'ok' : 'no'}">${done ? '已痊愈' : '还没好'}</em></span>
       </div>
       ${thumbs.length ? `<span class="ep-th">${thumbs.map(p => `<img src="${esc(p)}" alt="">`).join('')}</span>` : ''}
       <span class="ep-caret">${svg(open ? P.up : P.down, 20)}</span>
