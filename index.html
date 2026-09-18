@@ -6,12 +6,12 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="健康管理">
+<meta name="apple-mobile-web-app-title" content="健康簿">
 <meta name="theme-color" content="#EEF1EC">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" href="icon-192.png">
-<title>健康管理</title>
+<title>健康簿</title>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -359,7 +359,7 @@ const BOXES = { cat: '猫用药', human: '人用药' };
 const REMIND_OPTIONS = [30, 60, 120];
 const LOG_TEXT = { add: '添加', in: '入库', use: '用完', open: '开封' };
 const FB_VER = '10.12.2';
-const APP_VER = '2026.09.17-38';
+const APP_VER = '2026.09.17-39';
 const MAX_PHOTOS = 6;
 const PHOTO_PX = 640;
 const PHOTO_Q = 0.62;
@@ -1408,7 +1408,7 @@ async function doAuth(kind) {
 async function exportData() {
   const data = { app: 'yaoxiang', v: 2, exportedAt: new Date().toISOString() };
   COLS.forEach(c => { data[c] = [...state[c].values()]; });
-  const name = `健康管理备份-${todayStr()}.json`;
+  const name = `健康簿备份-${todayStr()}.json`;
   const file = new File([JSON.stringify(data)], name, { type: 'application/json' });
   if (navigator.canShare && navigator.canShare({ files: [file] })) {
     try { await navigator.share({ files: [file] }); return; }
