@@ -364,7 +364,7 @@ const BOXES = { cat: '猫用药', human: '人用药' };
 const REMIND_OPTIONS = [30, 60, 120];
 const LOG_TEXT = { add: '添加', in: '入库', use: '用完', open: '开封' };
 const FB_VER = '10.12.2';
-const APP_VER = '2026.09.17-45';
+const APP_VER = '2026.09.17-46';
 const MAX_PHOTOS = 6;
 const PHOTO_PX = 640;
 const PHOTO_Q = 0.62;
@@ -377,7 +377,7 @@ const COLS = ['meds', 'members', 'symptoms', 'logs', 'lists'];
 const state = {
   meds: new Map(), members: new Map(), symptoms: new Map(), logs: new Map(), lists: new Map(),
   ready: false, user: null, search: '', searchOpen: false, expiredOpen: false,
-  cal: '', calDay: '', calView: 'month', symFilter: '', sortAsc: true, range: { kind: 'year' }, epOpen: {}
+  cal: '', calDay: '', calView: 'month', symFilter: '', sortAsc: true, range: { kind: 'year' }, epOpen: {}, epFocus: ''
 };
 let store = null;
 let sheet = null;
@@ -1919,7 +1919,7 @@ function logsHtml(list) {
   return groups.map(g => {
     if (!g.key || g.rows.length < 2) return logRow(g.rows[0]);
     g.rows = g.rows.slice().sort((a, b) => a.date.localeCompare(b.date));
-    const open = state.epOpen[g.key] === undefined ? g.key === newest : state.epOpen[g.key];
+    const open = state.epOpen[g.key] === undefined ? (g.key === newest || g.key === state.epFocus) : state.epOpen[g.key];
     return episodeBlock(g.key, g.rows, open);
   }).join('');
 }
@@ -1951,8 +1951,13 @@ function viewMember(id) {
     </nav>`;
   let shown = logs.filter(l => (!filter || logKey(l) === filter));
   let listTitle;
-  if (state.calDay) {
+  let dayEp = '';
+  if (state.epFocus) {
+    shown = shown.filter(l => episodeKeyOf(l) === state.epFocus);
+    listTitle = shown.length ? `${symName(shown[0].symptomId)}这一次` : '这一次';
+  } else if (state.calDay) {
     shown = shown.filter(l => l.date === state.calDay);
+    dayEp = shown.map(episodeKeyOf).find(Boolean) || '';
     listTitle = `${dot(state.calDay)} 的记录`;
   } else if (filter) {
     listTitle = `${keyName(filter)}的全部记录`;
@@ -1981,7 +1986,8 @@ function viewMember(id) {
         ? '<p class="hint" style="text-align:center">点某一天，看那天的记录；点左边的月份数字，切到那个月</p>'
         : `<div class="sec-row"><h2 class="sec">${listTitle}</h2>
             <div style="display:flex;align-items:center;gap:6px">
-              ${state.calDay ? '<button class="link-btn" data-act="cal-day" data-v="">看整段</button>' : ''}
+              ${dayEp ? `<button class="link-btn" data-act="ep-focus" data-k="${esc(dayEp)}">看这一次</button>` : ''}
+              ${state.calDay || state.epFocus ? '<button class="link-btn" data-act="clear-view">看全部</button>' : ''}
               ${sortBtn}
             </div></div>
           ${shown.length ? `<div class="logs">${logsHtml(shown)}</div>`
@@ -2533,10 +2539,14 @@ const actions = {
   'cal-day': el => {
     const v = el.dataset.v;
     state.calDay = (v && state.calDay !== v) ? v : '';
+    state.epFocus = '';
     render();
   },
+  'ep-focus': el => { state.epFocus = el.dataset.k; state.calDay = ''; render(); },
+  'clear-view': () => { state.calDay = ''; state.epFocus = ''; render(); },
   'sym-filter': el => {
     const v = el.dataset.v;
+    state.epFocus = '';
     if (!v && !state.symFilter) { openRangeSheet(); return; }
     state.symFilter = v;
     state.calDay = '';
@@ -2568,7 +2578,7 @@ const actions = {
     state.epOpen[k] = !cur;
     render();
   },
-  'range-set': el => { state.range = { kind: el.dataset.v }; closeLayer(); render(); },
+  'range-set': el => { state.range = { kind: el.dataset.v }; state.epFocus = ''; closeLayer(); render(); },
   'range-custom': () => openCustomRange(),
   'range-custom-ok': () => {
     if (!rangePick.from || !rangePick.to) { toast('两个日期都要选'); return; }
@@ -2808,7 +2818,7 @@ window.addEventListener('hashchange', () => {
   if (r[0] !== 'member' || (r[1] !== 'new' && r[1] !== 'edit')) mform = null;
   if (r[0] !== 'log') lf = null;
   if (r[0] !== 'symptom') tpl = null;
-  if (r[0] !== 'member' && r[0] !== 'log') { state.cal = ''; state.calDay = ''; state.symFilter = ''; state.epOpen = {}; }
+  if (r[0] !== 'member' && r[0] !== 'log') { state.cal = ''; state.calDay = ''; state.symFilter = ''; state.epOpen = {}; state.epFocus = ''; }
   state.search = '';
   state.searchOpen = false;
   state.expiredOpen = false;
