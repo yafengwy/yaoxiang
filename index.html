@@ -343,7 +343,7 @@ const BOXES = { cat: '猫用药', human: '人用药' };
 const REMIND_OPTIONS = [30, 60, 120];
 const LOG_TEXT = { add: '添加', in: '入库', use: '用完', open: '开封' };
 const FB_VER = '10.12.2';
-const APP_VER = '2026.09.17-32';
+const APP_VER = '2026.09.17-33';
 const MAX_PHOTOS = 6;
 const PHOTO_PX = 640;
 const PHOTO_Q = 0.62;
@@ -1858,11 +1858,12 @@ function viewMember(id) {
       : episodeCount(id, k, rb.from, rb.to);
   });
   const totalTimes = symIds.reduce((n, sid) => n + counts[sid], 0);
-  const chips = symIds.length ? `<nav class="pills">
+  const shownIds = symIds.filter(k => counts[k] > 0 || filter === k);
+  const chips = `<nav class="pills">
       <button class="pill${filter ? '' : ' on'}" data-act="sym-filter" data-v="">全部 ${totalTimes} 次 · ${rb.label}${svg(P.down, 14)}</button>
-      ${symIds.map(k => `<button class="pill${filter === k ? ' on' : ''}" data-act="sym-filter" data-v="${k}">
+      ${shownIds.map(k => `<button class="pill${filter === k ? ' on' : ''}" data-act="sym-filter" data-v="${k}">
         ${k === 'vaccine' || k === 'visit' ? markHtml(k, 15) : `<i class="dot" style="background:${symColor(k)}"></i>`}${esc(keyName(k))} ${counts[k]} 次</button>`).join('')}
-    </nav>` : '';
+    </nav>`;
   let shown = logs.filter(l => (!filter || logKey(l) === filter));
   let listTitle;
   if (state.calDay) {
