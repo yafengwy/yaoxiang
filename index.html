@@ -362,7 +362,7 @@ const BOXES = { cat: '猫用药', human: '人用药' };
 const REMIND_OPTIONS = [30, 60, 120];
 const LOG_TEXT = { add: '添加', in: '入库', use: '用完', open: '开封' };
 const FB_VER = '10.12.2';
-const APP_VER = '2026.09.17-42';
+const APP_VER = '2026.09.17-43';
 const MAX_PHOTOS = 6;
 const PHOTO_PX = 640;
 const PHOTO_Q = 0.62;
@@ -2539,7 +2539,19 @@ const actions = {
     }
     render();
   },
-  'sort-toggle': () => { state.sortAsc = !state.sortAsc; render(); },
+  'sort-toggle': () => {
+    state.sortAsc = !state.sortAsc;
+    const r = route();
+    if (r[0] === 'member' && r[1]) {
+      const rb = rangeBounds();
+      const f = state.symFilter;
+      let arr = logsOf(r[1]).filter(l => !f || logKey(l) === f);
+      if (!f) arr = arr.filter(l => l.date >= rb.from && l.date <= rb.to);
+      if (arr.length) state.cal = state.sortAsc ? arr[0].date : arr[arr.length - 1].date;
+      state.calDay = '';
+    }
+    render();
+  },
   'ep-toggle': el => {
     const k = el.dataset.k;
     const cur = el.closest('.ep').querySelector('.ep-kids');
