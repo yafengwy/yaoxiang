@@ -278,11 +278,17 @@ button.tag{height:34px;padding:0 12px;font-size:14px;border-radius:10px;display:
 .healed{margin-left:8px;font-size:12px;font-weight:500;color:var(--accent);background:var(--accent-soft);padding:1px 8px;border-radius:999px}
 .cal-cell.today .num{color:var(--accent)}
 .cal-cell.on{background:var(--accent-soft)}
-.logs{display:flex;flex-direction:column;gap:10px}
-.log-row{display:flex;gap:12px;align-items:flex-start;background:var(--card);border-radius:18px;padding:14px 16px;color:var(--ink)}
-.log-row .dot{width:8px;height:8px;border-radius:4px;margin-top:7px;flex-shrink:0}
+.logs{display:flex;flex-direction:column}
+.log-wrap{display:flex;gap:10px;padding-bottom:10px;position:relative}
+.log-wrap:last-child{padding-bottom:0}
+.rail{width:16px;flex-shrink:0;position:relative}
+.rail .dot{position:absolute;left:50%;transform:translateX(-50%);top:17px;width:10px;height:10px;border-radius:5px}
+.rail .kicon{position:absolute;left:50%;transform:translateX(-50%);top:12px}
+.rl{position:absolute;left:50%;transform:translateX(-50%);width:3px;border-radius:2px}
+.rl.top{top:0;height:22px}
+.rl.bot{top:17px;bottom:0}
+.log-row{flex:1;min-width:0;display:flex;gap:12px;align-items:flex-start;background:var(--card);border-radius:18px;padding:14px 16px;color:var(--ink)}
 .kicon{display:inline-flex;align-items:center;justify-content:center;flex-shrink:0}
-.log-row .kicon{margin-top:2px}
 .cal-cell .dots .kicon{height:13px}
 .pill .kicon{margin-right:5px}
 .log-b{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
@@ -343,7 +349,7 @@ const BOXES = { cat: '猫用药', human: '人用药' };
 const REMIND_OPTIONS = [30, 60, 120];
 const LOG_TEXT = { add: '添加', in: '入库', use: '用完', open: '开封' };
 const FB_VER = '10.12.2';
-const APP_VER = '2026.09.17-33';
+const APP_VER = '2026.09.17-34';
 const MAX_PHOTOS = 6;
 const PHOTO_PX = 640;
 const PHOTO_Q = 0.62;
@@ -1563,6 +1569,18 @@ function vacDue(l) {
   d.setFullYear(d.getFullYear() + Number(l.years));
   return ymd(d);
 }
+function episodeKeyOf(l) {
+  if (kindOf(l) !== 'symptom') return '';
+  const sy = symOf(l.symptomId);
+  if (sy && sy.healTrack === false) return '';
+  const arr = logsFor(l.memberId, l.symptomId);
+  let ep = 0;
+  for (const x of arr) {
+    if (x.id === l.id) return l.symptomId + '#' + ep;
+    if (x.healed) ep++;
+  }
+  return '';
+}
 function logTitle(l) {
   const k = kindOf(l);
   if (k === 'vaccine') return `疫苗${l.vacName ? '：' + esc(l.vacName) : ''}`;
@@ -1821,22 +1839,38 @@ function calHtml(id, anchor, view, filter) {
     <p class="cal-tip">浅色的点表示这几天还没好，只是没单独记录</p>
   </div>`;
 }
-function logRow(l) {
+function logRow(l, top, bot) {
   const sum = summaryOf(l);
   const k = kindOf(l);
+  const color = logColor(l);
   const mark = k === 'symptom'
-    ? `<i class="dot" style="background:${logColor(l)}"></i>`
-    : `<span class="kicon" style="color:${logColor(l)}">${svg(k === 'vaccine' ? P.vaccine : P.visit, 18, 1.8)}</span>`;
-  return `<a class="log-row" href="#/log/${l.id}">
-    ${mark}
-    <div class="log-b">
-      <b>${dot(l.date).slice(5)} ${logTitle(l)}${l.healed ? '<span class="healed">已痊愈</span>' : ''}</b>
-      ${sum ? `<span class="row-s">${esc(sum)}</span>` : ''}
-      ${l.note ? `<span class="row-s">${esc(l.note)}</span>` : ''}
-      ${(l.files || []).length ? `<span class="row-s accent-t">${svg(P.file, 13, 1.8)} ${l.files.length} 个文件</span>` : ''}
-    </div>
-    ${(l.photos || []).length ? `<img class="log-th" src="${esc(l.photos[0])}" alt="">` : ''}
-  </a>`;
+    ? `<i class="dot" style="background:${color}"></i>`
+    : `<span class="kicon" style="color:${color}">${svg(k === 'vaccine' ? P.vaccine : P.visit, 18, 1.8)}</span>`;
+  return `<div class="log-wrap">
+    <span class="rail">
+      ${top ? `<i class="rl top" style="background:${color}"></i>` : ''}
+      ${bot ? `<i class="rl bot" style="background:${color}"></i>` : ''}
+      ${mark}
+    </span>
+    <a class="log-row" href="#/log/${l.id}">
+      <div class="log-b">
+        <b>${dot(l.date).slice(5)} ${logTitle(l)}${l.healed ? '<span class="healed">已痊愈</span>' : ''}</b>
+        ${sum ? `<span class="row-s">${esc(sum)}</span>` : ''}
+        ${l.note ? `<span class="row-s">${esc(l.note)}</span>` : ''}
+        ${(l.files || []).length ? `<span class="row-s accent-t">${svg(P.file, 13, 1.8)} ${l.files.length} 个文件</span>` : ''}
+      </div>
+      ${(l.photos || []).length ? `<img class="log-th" src="${esc(l.photos[0])}" alt="">` : ''}
+    </a>
+  </div>`;
+}
+function logsHtml(list) {
+  const keys = list.map(episodeKeyOf);
+  return list.map((l, i) => {
+    const k = keys[i];
+    const top = !!k && i > 0 && keys[i - 1] === k;
+    const bot = !!k && i < list.length - 1 && keys[i + 1] === k;
+    return logRow(l, top, bot);
+  }).join('');
 }
 function viewMember(id) {
   const me = state.members.get(id);
@@ -1899,7 +1933,7 @@ function viewMember(id) {
               ${state.calDay ? '<button class="link-btn" data-act="cal-day" data-v="">看整段</button>' : ''}
               ${sortBtn}
             </div></div>
-          ${shown.length ? `<div class="logs">${shown.map(logRow).join('')}</div>`
+          ${shown.length ? `<div class="logs">${logsHtml(shown)}</div>`
             : '<p class="empty">这段时间没有记录</p>'}`}
     </main>
     <a class="fab" href="#/log/new/${id}" aria-label="添加记录">${svg(P.plus, 28, 2.2)}</a>`;
