@@ -366,7 +366,7 @@ const BOXES = { cat: '猫用药', human: '人用药' };
 const REMIND_OPTIONS = [30, 60, 120];
 const LOG_TEXT = { add: '添加', in: '入库', use: '用完', open: '开封' };
 const FB_VER = '10.12.2';
-const APP_VER = '2026.09.19-48';
+const APP_VER = '2026.09.19-49';
 const MAX_PHOTOS = 6;
 const PHOTO_PX = 640;
 const PHOTO_Q = 0.62;
@@ -379,7 +379,7 @@ const COLS = ['meds', 'members', 'symptoms', 'logs', 'lists'];
 const state = {
   meds: new Map(), members: new Map(), symptoms: new Map(), logs: new Map(), lists: new Map(),
   ready: false, user: null, search: '', searchOpen: false, expiredOpen: false,
-  cal: '', calDay: '', calView: 'month', symFilter: '', sortAsc: true, range: { kind: 'year' }, epOpen: {}, epFocus: ''
+  cal: '', calDay: '', calView: 'month', symFilter: '', sortAsc: false, range: { kind: 'year' }, epOpen: {}, epFocus: ''
 };
 let store = null;
 let sheet = null;
