@@ -296,9 +296,9 @@ button.tag{height:34px;padding:0 12px;font-size:14px;border-radius:10px;display:
 .ep-b{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
 .ep-b b{font-size:16px;line-height:1.3}
 .ep-b span{font-size:13px;color:var(--muted)}
-.ep-th{display:flex;flex-shrink:0}
+.ep-th{display:flex;flex-wrap:wrap;justify-content:flex-end;row-gap:4px;flex-shrink:0;max-width:74px}
 .ep-th img{width:30px;height:30px;border-radius:9px;object-fit:cover;margin-left:-9px;border:2px solid var(--card)}
-.ep-th img:first-child{margin-left:0}
+.ep-th img:nth-child(3n+1){margin-left:0}
 .ep-caret{color:var(--muted);display:flex;flex-shrink:0}
 .ep-kids{display:flex;flex-direction:column;gap:8px;margin-left:18px}
 .log-row.in-ep{background:var(--card)}
@@ -366,7 +366,7 @@ const BOXES = { cat: '猫用药', human: '人用药' };
 const REMIND_OPTIONS = [30, 60, 120];
 const LOG_TEXT = { add: '添加', in: '入库', use: '用完', open: '开封' };
 const FB_VER = '10.12.2';
-const APP_VER = '2026.09.19-51';
+const APP_VER = '2026.09.19-54';
 const MAX_PHOTOS = 6;
 const PHOTO_PX = 640;
 const PHOTO_Q = 0.62;
@@ -379,7 +379,7 @@ const COLS = ['meds', 'members', 'symptoms', 'logs', 'lists'];
 const state = {
   meds: new Map(), members: new Map(), symptoms: new Map(), logs: new Map(), lists: new Map(),
   ready: false, user: null, search: '', searchOpen: false, expiredOpen: false,
-  cal: '', calDay: '', calView: 'month', symFilter: '', sortAsc: false, range: { kind: 'year' }, epOpen: {}, epFocus: ''
+  cal: '', calDay: '', calView: 'month', symFilter: '', sortAsc: false, range: { kind: 'cal' }, epOpen: {}, epFocus: ''
 };
 let store = null;
 let sheet = null;
@@ -1543,8 +1543,12 @@ function newSymptom(name) {
   return s;
 }
 function rangeBounds() {
-  const r = state.range || { kind: 'year' };
+  const r = state.range || { kind: 'cal' };
   const t = todayStr();
+  if (r.kind === 'cal') {
+    const c = calRange(state.cal || t, state.calView);
+    return { from: c.from, to: c.to, label: c.label };
+  }
   const y = t.slice(0, 4), m = t.slice(0, 7);
   if (r.kind === 'all') return { from: '0000-01-01', to: '9999-12-31', label: '全部' };
   if (r.kind === 'month') {
@@ -1889,7 +1893,7 @@ function episodeBlock(key, grp, open) {
   const done = grp.some(l => l.healed);
   const days = Math.round((parseYmd(to) - parseYmd(from)) / 86400000) + 1;
   const color = logColor(first);
-  const thumbs = grp.map(l => (l.photos || [])[0]).filter(Boolean).slice(0, 3);
+  const thumbs = grp.map(l => (l.photos || [])[0]).filter(Boolean).slice(0, 9);
   const span = from === to ? dot(from).slice(5) : `${dot(from).slice(5)} – ${dot(to).slice(5)}`;
   return `<div class="ep">
     <button class="ep-head" data-act="ep-toggle" data-k="${esc(key)}">
@@ -1987,9 +1991,9 @@ function viewMember(id) {
     ${chips}
     <main class="pad" style="padding-top:4px;padding-bottom:120px">
       ${calHtml(id, anchor, state.calView, filter)}
-      ${(state.calView === 'year' && !state.calDay)
-        ? '<p class="hint" style="text-align:center">点某一天，看那天的记录；点左边的月份数字，切到那个月</p>'
-        : `<div class="sec-row"><h2 class="sec">${listTitle}</h2>
+      ${(state.calView === 'year' && !state.calDay && !state.epFocus)
+        ? '<p class="hint" style="text-align:center">点某一天，看那天的记录；点左边的月份数字，切到那个月</p>' : ''}
+      ${`<div class="sec-row"><h2 class="sec">${listTitle}</h2>
             <div style="display:flex;align-items:center;gap:6px">
               ${dayEp ? `<button class="link-btn" data-act="ep-focus" data-k="${esc(dayEp)}">看这一次</button>` : ''}
               ${state.calDay || state.epFocus ? '<button class="link-btn" data-act="clear-view">看全部</button>' : ''}
@@ -2263,11 +2267,12 @@ function delLog() {
 /* ---------- 板块与选项的管理 ---------- */
 let rangePick = null;
 function openRangeSheet() {
-  const cur = (state.range || {}).kind || 'year';
+  const cur = (state.range || {}).kind || 'cal';
   const opt = (k, l) => `<button data-act="range-set" data-v="${k}"><span>${l}</span>${cur === k ? `<span class="accent-t">${svg(P.check, 16, 2.6)}</span>` : ''}</button>`;
   showLayer(`<div class="scrim" data-act="close"></div>
     <div class="sheet menu-sheet" role="dialog" aria-label="看哪段时间">
       <h2 class="sheet-t">看哪段时间</h2>
+      ${opt('cal', '跟着日历')}
       ${opt('month', '当月')}
       ${opt('half', '近半年')}
       ${opt('year', '今年')}
@@ -2553,10 +2558,25 @@ const actions = {
     else d.setMonth(d.getMonth() + step, 1);
     state.cal = ymd(d);
     state.calDay = '';
+    state.epFocus = '';
+    state.range = { kind: 'cal' };
     render();
   },
-  'cal-view': el => { state.calView = el.dataset.v; state.calDay = ''; render(); },
-  'cal-month': el => { state.cal = el.dataset.v; state.calView = 'month'; state.calDay = ''; render(); },
+  'cal-view': el => {
+    state.calView = el.dataset.v;
+    state.calDay = '';
+    state.epFocus = '';
+    state.range = { kind: 'cal' };
+    render();
+  },
+  'cal-month': el => {
+    state.cal = el.dataset.v;
+    state.calView = 'month';
+    state.calDay = '';
+    state.epFocus = '';
+    state.range = { kind: 'cal' };
+    render();
+  },
   'cal-day': el => {
     const v = el.dataset.v;
     state.calDay = (v && state.calDay !== v) ? v : '';
