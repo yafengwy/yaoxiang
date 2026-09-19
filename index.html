@@ -19,6 +19,7 @@
   --accent:#2E6A4C; --accent-ink:#FFFFFF; --accent-soft:#DDEBE2;
   --warn:#8A4F00; --warn-soft:#FBE8CC; --bad:#A8261C; --bad-soft:#F8DEDB;
   --ph:#E1E7E0; --scrim:rgba(20,26,23,.45);
+  --alt-soft:#E5E1EE; --alt-ink:#5B4A82;
   color-scheme:light dark;
 }
 @media (prefers-color-scheme: dark){
@@ -27,6 +28,7 @@
     --accent:#5FB38A; --accent-ink:#0E1411; --accent-soft:#1F3A2D;
     --warn:#F0B35A; --warn-soft:#3A2B14; --bad:#F08A80; --bad-soft:#3A1C19;
     --ph:#2A322E; --scrim:rgba(0,0,0,.6);
+    --alt-soft:#2A2540; --alt-ink:#B9A6EE;
   }
 }
 *{box-sizing:border-box}
@@ -242,7 +244,7 @@ button.tag{height:34px;padding:0 12px;font-size:14px;border-radius:10px;display:
 .menu-sheet button{width:100%;min-height:54px;border:0;border-bottom:1px solid var(--line);background:none;font-size:17px;text-align:left;padding:0}
 .menu-sheet button:last-child{border-bottom:0;color:var(--muted)}
 .menu-sheet .danger{color:var(--bad)}
-.tile-ic.alt{background:#E5E1EE;color:#5B4A82}
+.tile-ic.alt{background:var(--alt-soft);color:var(--alt-ink)}
 .mems{display:flex;flex-direction:column;gap:12px;margin-bottom:14px}
 .mem{display:flex;align-items:center;gap:16px;padding:14px 16px;background:var(--card);border-radius:22px;color:var(--ink)}
 .mem-b{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
@@ -364,7 +366,7 @@ const BOXES = { cat: '猫用药', human: '人用药' };
 const REMIND_OPTIONS = [30, 60, 120];
 const LOG_TEXT = { add: '添加', in: '入库', use: '用完', open: '开封' };
 const FB_VER = '10.12.2';
-const APP_VER = '2026.09.17-46';
+const APP_VER = '2026.09.19-48';
 const MAX_PHOTOS = 6;
 const PHOTO_PX = 640;
 const PHOTO_Q = 0.62;
@@ -1186,7 +1188,10 @@ function openCropper(src, onDone, onClose) {
     cropper = { img, V, base: V / Math.min(img.naturalWidth, img.naturalHeight), s: 1, ox: 0, oy: 0, onDone, onClose };
     renderCropper();
   };
-  img.onerror = () => toast('照片读取失败，换一张试试');
+  img.onerror = () => {
+    if (onClose) onClose();
+    toast('这张照片读不了，可能是 HEIC 格式，用「加文件」试试');
+  };
   img.src = src;
 }
 function renderCropper() {
@@ -2144,7 +2149,8 @@ function viewLog(mode, arg) {
 
   const photos = `<div class="photos">
     ${lf.photos.map((p, i) => `<button class="photo-thumb" data-act="lphoto-open" data-i="${i}" aria-label="第 ${i + 1} 张照片"><img src="${esc(p)}" alt=""></button>`).join('')}
-    ${lf.photos.length < 3 ? `<button class="photo-add" data-act="pick-lphoto">${svg(P.camera, 24, 1.8)}<span>照片 / 文件</span></button>` : ''}
+    ${lf.photos.length < 3 ? `<button class="photo-add" data-act="pick-lphoto">${svg(P.camera, 24, 1.8)}<span>加照片</span></button>` : ''}
+    <button class="photo-add" data-act="pick-lfile">${svg(P.file, 24, 1.8)}<span>加文件</span></button>
   </div>
   ${lf.files.length ? `<div class="files">${filesHtml(lf.files, 'lfile')}</div>` : ''}`;
 
@@ -2152,7 +2158,8 @@ function viewLog(mode, arg) {
   return topbar(`<button class="text-btn" data-act="cancel-log" data-to="${cancel}">取消</button>`,
       `${esc(me.name)} · ${mode === 'new' ? '添加记录' : LOG_KINDS[lf.kind] + '记录'}`, '') +
     `<main class="pad form" style="padding-bottom:40px">
-      <input type="file" id="lphoto-in" accept="image/*,application/pdf,.pdf" hidden>
+      <input type="file" id="lphoto-in" accept="image/*" hidden>
+      <input type="file" id="lfile-in" hidden>
       ${kindSeg}
       <div class="card">
         <label class="line"><span>日期</span><input data-lf="date" type="date" value="${lf.date}"></label>
@@ -2173,7 +2180,7 @@ function viewLog(mode, arg) {
       <textarea id="lf-note" class="note-input" data-lf="note" rows="3" placeholder="随便写点什么">${esc(lf.note)}</textarea>
       <div class="field-l">照片和文件</div>
       ${photos}
-      <p class="hint">照片最多 3 张；PDF 之类的文件直接存原件，最多 12 MB 一个</p>
+      <p class="hint">照片最多 3 张，会压缩并可以裁剪；文件（PDF 等）存原件，最多 12 MB 一个</p>
       <button class="btn primary wide" data-act="save-log">保存</button>
       ${lf.id ? '<button class="btn danger wide" data-act="del-log">删除这条记录</button>' : ''}
     </main>`;
@@ -2505,6 +2512,7 @@ const actions = {
   'del-member': delMember,
   'pick-mphoto': () => { photoPending = { target: 'member' }; document.getElementById('mphoto-in').click(); },
   'pick-lphoto': () => { photoPending = { target: 'log', mode: 'add' }; document.getElementById('lphoto-in').click(); },
+  'pick-lfile': () => document.getElementById('lfile-in').click(),
   'lphoto-menu': el => {
     const i = Number(el.dataset.i);
     showLayer(`<div class="scrim" data-act="close"></div>
@@ -2773,7 +2781,8 @@ document.addEventListener('change', async e => {
   const t = e.target;
   if ((t.id === 'photo-in' || t.id === 'mphoto-in' || t.id === 'lphoto-in') && t.files && t.files[0]) {
     const picked = t.files[0];
-    if (!/^image\//.test(picked.type)) {
+    const isImg = /^image\//.test(picked.type) || /\.(jpe?g|png|gif|webp|bmp|heic|heif)$/i.test(picked.name || '');
+    if (!isImg) {
       t.value = '';
       if (t.id !== 'lphoto-in' || !lf) { toast('这里只能放照片'); return; }
       uploadFile(picked, meta => { if (lf) { lf.files.push(meta); render(); } });
@@ -2798,6 +2807,11 @@ document.addEventListener('change', async e => {
     };
     openCropper(url, done, () => URL.revokeObjectURL(url));
     t.value = '';
+  } else if (t.id === 'lfile-in' && t.files && t.files[0]) {
+    const f = t.files[0];
+    t.value = '';
+    if (!lf) return;
+    uploadFile(f, meta => { if (lf) { lf.files.push(meta); render(); } });
   } else if (t.id === 'import-in' && t.files && t.files[0]) {
     await importData(t.files[0]);
     t.value = '';
