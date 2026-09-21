@@ -309,6 +309,7 @@ button.tag{height:34px;padding:0 12px;font-size:14px;border-radius:10px;display:
 .pill .kicon{margin-right:5px}
 .log-b{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
 .log-b b{font-size:16px}
+.log-date{font-size:16px;font-weight:400;color:var(--ink) !important;line-height:1.35}
 .log-th{width:52px;height:52px;border-radius:12px;object-fit:cover;flex-shrink:0}
 .pill .dot{width:8px;height:8px;border-radius:4px;margin-right:6px}
 .sec-block{margin-top:18px}
@@ -368,7 +369,7 @@ const BOXES = { cat: '猫用药', human: '人用药' };
 const REMIND_OPTIONS = [30, 60, 120];
 const LOG_TEXT = { add: '添加', in: '入库', use: '用完', open: '开封' };
 const FB_VER = '10.12.2';
-const APP_VER = '2026.09.19-64';
+const APP_VER = '2026.09.19-65';
 const MAX_PHOTOS = 6;
 const PHOTO_PX = 640;
 const PHOTO_Q = 0.62;
@@ -1908,7 +1909,10 @@ function logRow(l, inEp, withMember) {
     <a class="log-main" href="#/log/${l.id}">
       ${mark}
       <div class="log-b">
-        <b>${inEp ? dot(l.date).slice(5) : dot(l.date)}${inEp ? '' : ' ' + logTitle(l)}${withMember && !inEp ? ` <span class="who">${esc((state.members.get(l.memberId) || {}).name || '')}</span>` : ''}${l.healed ? '<span class="healed">已痊愈</span>' : ''}</b>
+        ${inEp
+          ? `<span class="log-date">${dot(l.date).slice(5)}${l.healed ? '<span class="healed">已痊愈</span>' : ''}</span>`
+          : `<b>${logTitle(l)}${withMember ? ` <span class="who">${esc((state.members.get(l.memberId) || {}).name || '')}</span>` : ''}${l.healed ? '<span class="healed">已痊愈</span>' : ''}</b>
+             <span class="log-date">${dot(l.date)}</span>`}
         ${parts.map(p => `<span class="row-s"><b>${esc(p.label)}</b> ${esc(p.value)}</span>`).join('')}
         ${l.note ? `<span class="row-note">${esc(l.note)}</span>` : ''}
         ${(l.files || []).length ? `<span class="row-s accent-t">${svg(P.file, 13, 1.8)} ${l.files.length} 个文件</span>` : ''}
@@ -1930,7 +1934,8 @@ function episodeBlock(key, grp, open, withMember) {
     <button class="ep-head" data-act="ep-toggle" data-k="${esc(key)}">
       <span class="dot" style="background:${color};${done ? 'opacity:.5' : ''}"></span>
       <div class="ep-b">
-        <b>${withMember ? esc((state.members.get(first.memberId) || {}).name || '') : esc(symName(first.symptomId))} ${span}</b>
+        <b>${esc(symName(first.symptomId))}${withMember ? ` <span class="who">${esc((state.members.get(first.memberId) || {}).name || '')}</span>` : ''}</b>
+        <span class="log-date">${span}</span>
         <span>${grp.length} 条记录 · ${days} 天<em class="st-chip ${done ? 'ok' : 'no'}">${done ? '已痊愈' : '还没好'}</em></span>
       </div>
       ${thumbs.length ? `<span class="ep-th">${thumbs.map(p => `<img src="${esc(p)}" alt="">`).join('')}</span>` : ''}
