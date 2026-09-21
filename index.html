@@ -368,7 +368,7 @@ const BOXES = { cat: '猫用药', human: '人用药' };
 const REMIND_OPTIONS = [30, 60, 120];
 const LOG_TEXT = { add: '添加', in: '入库', use: '用完', open: '开封' };
 const FB_VER = '10.12.2';
-const APP_VER = '2026.09.19-63';
+const APP_VER = '2026.09.19-64';
 const MAX_PHOTOS = 6;
 const PHOTO_PX = 640;
 const PHOTO_Q = 0.62;
@@ -1908,7 +1908,7 @@ function logRow(l, inEp, withMember) {
     <a class="log-main" href="#/log/${l.id}">
       ${mark}
       <div class="log-b">
-        <b>${dot(l.date).slice(5)}${inEp ? '' : ' ' + logTitle(l)}${withMember && !inEp ? ` <span class="who">${esc((state.members.get(l.memberId) || {}).name || '')}</span>` : ''}${l.healed ? '<span class="healed">已痊愈</span>' : ''}</b>
+        <b>${inEp ? dot(l.date).slice(5) : dot(l.date)}${inEp ? '' : ' ' + logTitle(l)}${withMember && !inEp ? ` <span class="who">${esc((state.members.get(l.memberId) || {}).name || '')}</span>` : ''}${l.healed ? '<span class="healed">已痊愈</span>' : ''}</b>
         ${parts.map(p => `<span class="row-s"><b>${esc(p.label)}</b> ${esc(p.value)}</span>`).join('')}
         ${l.note ? `<span class="row-note">${esc(l.note)}</span>` : ''}
         ${(l.files || []).length ? `<span class="row-s accent-t">${svg(P.file, 13, 1.8)} ${l.files.length} 个文件</span>` : ''}
@@ -1925,7 +1925,7 @@ function episodeBlock(key, grp, open, withMember) {
   const days = Math.round((parseYmd(to) - parseYmd(from)) / 86400000) + 1;
   const color = logColor(first);
   const thumbs = grp.map(l => (l.photos || [])[0]).filter(Boolean).slice(0, 9);
-  const span = from === to ? dot(from).slice(5) : `${dot(from).slice(5)} – ${dot(to).slice(5)}`;
+  const span = from === to ? dot(from) : `${dot(from)} – ${from.slice(0, 4) === to.slice(0, 4) ? dot(to).slice(5) : dot(to)}`;
   return `<div class="ep">
     <button class="ep-head" data-act="ep-toggle" data-k="${esc(key)}">
       <span class="dot" style="background:${color};${done ? 'opacity:.5' : ''}"></span>
