@@ -239,7 +239,8 @@ button.tag{height:34px;padding:0 12px;font-size:14px;border-radius:10px;display:
 .crop-tools input[type=range]{flex:1;accent-color:var(--accent)}
 .viewer-x{position:absolute;top:calc(env(safe-area-inset-top) + 8px);right:12px;color:#fff;background:rgba(255,255,255,.2);border-radius:22px}
 .viewer-more{position:absolute;right:16px;bottom:calc(env(safe-area-inset-bottom) + 24px);color:#fff;background:rgba(255,255,255,.2);border-radius:24px;width:48px;height:48px}
-.viewer-nav{position:absolute;left:0;right:0;bottom:calc(env(safe-area-inset-bottom) + 24px);display:flex;align-items:center;justify-content:center;gap:20px;color:#fff;font-size:15px}
+.viewer-nav{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom) + 24px);display:flex;align-items:center;justify-content:center;gap:20px;color:#fff;font-size:15px;pointer-events:none;max-width:60%}
+.viewer-nav button{pointer-events:auto}
 .viewer-nav button{width:48px;height:48px;border-radius:24px;border:0;background:rgba(255,255,255,.2);color:#fff;display:flex;align-items:center;justify-content:center}
 .menu-sheet button{width:100%;min-height:54px;border:0;border-bottom:1px solid var(--line);background:none;font-size:17px;text-align:left;padding:0}
 .menu-sheet button:last-child{border-bottom:0;color:var(--muted)}
@@ -367,7 +368,7 @@ const BOXES = { cat: '猫用药', human: '人用药' };
 const REMIND_OPTIONS = [30, 60, 120];
 const LOG_TEXT = { add: '添加', in: '入库', use: '用完', open: '开封' };
 const FB_VER = '10.12.2';
-const APP_VER = '2026.09.19-60';
+const APP_VER = '2026.09.19-61';
 const MAX_PHOTOS = 6;
 const PHOTO_PX = 640;
 const PHOTO_Q = 0.62;
