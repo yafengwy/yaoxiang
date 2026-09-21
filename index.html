@@ -368,7 +368,7 @@ const BOXES = { cat: '猫用药', human: '人用药' };
 const REMIND_OPTIONS = [30, 60, 120];
 const LOG_TEXT = { add: '添加', in: '入库', use: '用完', open: '开封' };
 const FB_VER = '10.12.2';
-const APP_VER = '2026.09.19-61';
+const APP_VER = '2026.09.19-62';
 const MAX_PHOTOS = 6;
 const PHOTO_PX = 640;
 const PHOTO_Q = 0.62;
@@ -1393,6 +1393,11 @@ function viewSettings() {
       ${cloud ? '<button class="line btn-line" data-act="logout">退出登录</button>' : ''}
     </div>
     ${cloud ? '' : '<p class="hint">现在数据只在这台手机上。设置好云同步后，换手机登录就能看到。</p>'}
+    <h2 class="sec">版本</h2>
+    <div class="card">
+      <div class="line"><span>当前版本</span><span class="muted">${APP_VER}</span></div>
+      <button class="line btn-line" data-act="check-update">检查更新</button>
+    </div>
     <h2 class="sec">备份</h2>
     <div class="card">
       <button class="line btn-line" data-act="export">导出备份</button>
@@ -2402,6 +2407,51 @@ function viewSymLogs(id) {
     </main>`;
 }
 
+/* ---------- 检查更新 ---------- */
+let lastCheck = 0;
+async function checkUpdate(manual) {
+  if (!manual && Date.now() - lastCheck < 1800000) return;
+  lastCheck = Date.now();
+  try {
+    const res = await fetch('./index.html?v=' + Date.now(), { cache: 'no-store' });
+    if (!res.ok) throw new Error(res.status);
+    const txt = await res.text();
+    const m = txt.match(/const APP_VER = '([^']+)'/);
+    if (!m) { if (manual) toast('查不到版本信息'); return; }
+    if (m[1] === APP_VER) { if (manual) toast('已经是最新版 ' + APP_VER); return; }
+    showUpdateSheet(m[1]);
+  } catch (e) {
+    if (manual) toast('检查失败：' + e.message);
+  }
+}
+function showUpdateSheet(v) {
+  showLayer(`<div class="scrim" data-act="close"></div>
+    <div class="sheet" role="dialog" aria-label="有新版本">
+      <h2 class="sheet-t">有新版本</h2>
+      <p>现在是 ${esc(APP_VER)}，新版是 ${esc(v)}。更新只是重新加载页面，记录不会丢。</p>
+      <div class="actions2">
+        <button class="btn" data-act="close">以后再说</button>
+        <button class="btn primary" data-act="do-update">马上更新</button>
+      </div></div>`);
+}
+async function doUpdate() {
+  closeLayer();
+  toast('正在更新…');
+  try {
+    if (window.caches && caches.keys) {
+      const ks = await caches.keys();
+      await Promise.all(ks.map(k => caches.delete(k)));
+    }
+  } catch (e) { /* ignore */ }
+  try {
+    if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map(r => r.update()));
+    }
+  } catch (e) { /* ignore */ }
+  setTimeout(() => location.reload(), 300);
+}
+
 /* ---------- 路由与渲染 ---------- */
 function route() {
   return location.hash.replace(/^#\/?/, '').split('/').filter(Boolean).map(s => {
@@ -2825,6 +2875,8 @@ const actions = {
   login: () => doAuth('login'),
   reset: () => doAuth('reset'),
   logout: () => { if (confirm('退出登录？')) store.logout(); },
+  'check-update': () => checkUpdate(true),
+  'do-update': doUpdate,
   export: exportData,
   import: () => document.getElementById('import-in').click()
 };
@@ -2950,7 +3002,9 @@ window.addEventListener('hashchange', () => {
   window.scrollTo(0, 0);
 });
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible' && state.ready && !form) render();
+  if (document.visibilityState !== 'visible') return;
+  if (state.ready && !form) render();
+  checkUpdate();
 });
 
 /* ---------- 下拉刷新（首页和药箱列表） ---------- */
@@ -3003,6 +3057,7 @@ async function init() {
   if ('serviceWorker' in navigator && location.protocol === 'https:') {
     navigator.serviceWorker.register('sw.js').catch(() => {});
   }
+  setTimeout(() => checkUpdate(), 4000);
 }
 init();
 </script>
