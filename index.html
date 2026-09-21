@@ -368,7 +368,7 @@ const BOXES = { cat: '猫用药', human: '人用药' };
 const REMIND_OPTIONS = [30, 60, 120];
 const LOG_TEXT = { add: '添加', in: '入库', use: '用完', open: '开封' };
 const FB_VER = '10.12.2';
-const APP_VER = '2026.09.19-62';
+const APP_VER = '2026.09.19-63';
 const MAX_PHOTOS = 6;
 const PHOTO_PX = 640;
 const PHOTO_Q = 0.62;
@@ -2687,7 +2687,7 @@ const actions = {
   },
   'cal-view': el => {
     state.calView = el.dataset.v;
-    state.calDay = '';
+    if (state.calDay) state.cal = state.calDay;
     state.epFocus = '';
     state.range = { kind: 'cal' };
     render();
