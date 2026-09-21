@@ -367,7 +367,7 @@ const BOXES = { cat: '猫用药', human: '人用药' };
 const REMIND_OPTIONS = [30, 60, 120];
 const LOG_TEXT = { add: '添加', in: '入库', use: '用完', open: '开封' };
 const FB_VER = '10.12.2';
-const APP_VER = '2026.09.19-59';
+const APP_VER = '2026.09.19-60';
 const MAX_PHOTOS = 6;
 const PHOTO_PX = 640;
 const PHOTO_Q = 0.62;
@@ -578,7 +578,9 @@ function delDoc(col, id) {
 function save(m) { saveDoc('meds', m); }
 
 /* ---------- 弹层 ---------- */
+let layerAt = 0;
 function showLayer(html) {
+  layerAt = Date.now();
   const wasOpen = $layer.classList.contains('open');
   $layer.innerHTML = html;
   $layer.classList.add('open');
@@ -2829,6 +2831,7 @@ const actions = {
 document.addEventListener('click', e => {
   const el = e.target.closest('[data-act]');
   if (!el || el.disabled) return;
+  if ($layer.contains(el) && Date.now() - layerAt < 300) { e.preventDefault(); return; }
   const fn = actions[el.dataset.act];
   if (fn) { e.preventDefault(); fn(el, e); }
 });
