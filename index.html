@@ -232,7 +232,7 @@ button.tag{height:34px;padding:0 12px;font-size:14px;border-radius:10px;display:
 .strip img{width:100%;height:100%;object-fit:cover;display:block}
 .note-box{white-space:pre-wrap;padding:14px 0;font-size:16px}
 .line textarea{flex:1;min-width:0;border:0;background:none;font:inherit;font-size:16px;padding:14px 0;resize:none;text-align:left;line-height:1.5;overflow:hidden}
-.note-input{width:100%;border:0;border-radius:16px;background:var(--card);padding:14px 16px;font:inherit;font-size:16px;line-height:1.5;resize:none;overflow:hidden;color:var(--ink);box-sizing:border-box}
+.note-input{width:100%;border:0;border-radius:16px;background:var(--card);padding:14px 16px;font:inherit;font-size:16px;line-height:1.5;resize:none;overflow:auto;color:var(--ink);box-sizing:border-box;max-height:60vh}
 .crop-wrap{width:min(320px,78vw);height:min(320px,78vw);margin:10px auto 14px;border-radius:18px;overflow:hidden;background:#000;position:relative;touch-action:none}
 .crop-wrap img{position:absolute;left:50%;top:50%;transform-origin:center;will-change:transform;-webkit-user-drag:none;user-select:none;max-width:none}
 .crop-tools{display:flex;align-items:center;gap:10px}
@@ -282,6 +282,7 @@ button.tag{height:34px;padding:0 12px;font-size:14px;border-radius:10px;display:
 .cal-cell .dots i.soft{opacity:.35}
 .cal-tip{margin:8px 4px 0;font-size:12px;color:var(--muted);text-align:center}
 .seg.tiny button{height:32px;padding:0 12px;font-size:14px;font-weight:500}
+.who{font-weight:500;color:var(--muted);font-size:14px;margin-left:6px}
 .healed{margin-left:8px;font-size:12px;font-weight:500;color:var(--accent);background:var(--accent-soft);padding:1px 8px;border-radius:999px}
 .cal-cell.today .num{color:var(--accent)}
 .cal-cell.on{background:var(--accent-soft)}
@@ -366,7 +367,7 @@ const BOXES = { cat: '猫用药', human: '人用药' };
 const REMIND_OPTIONS = [30, 60, 120];
 const LOG_TEXT = { add: '添加', in: '入库', use: '用完', open: '开封' };
 const FB_VER = '10.12.2';
-const APP_VER = '2026.09.19-54';
+const APP_VER = '2026.09.19-59';
 const MAX_PHOTOS = 6;
 const PHOTO_PX = 640;
 const PHOTO_Q = 0.62;
@@ -379,7 +380,7 @@ const COLS = ['meds', 'members', 'symptoms', 'logs', 'lists'];
 const state = {
   meds: new Map(), members: new Map(), symptoms: new Map(), logs: new Map(), lists: new Map(),
   ready: false, user: null, search: '', searchOpen: false, expiredOpen: false,
-  cal: '', calDay: '', calView: 'month', symFilter: '', sortAsc: false, range: { kind: 'cal' }, epOpen: {}, epFocus: ''
+  cal: '', calDay: '', calView: 'month', symFilter: '', sortAsc: false, symMember: '', range: { kind: 'cal' }, epOpen: {}, epFocus: ''
 };
 let store = null;
 let sheet = null;
@@ -1346,10 +1347,32 @@ function filesHtml(list, act) {
     <button class="icon-btn small" data-act="${act}-del" data-i="${i}" aria-label="删掉这个文件">${svg(P.close, 16)}</button>
   </div>`).join('');
 }
+async function savePhoto(dataUrl, name) {
+  try {
+    const res = await fetch(dataUrl);
+    const blob = await res.blob();
+    const file = new File([blob], name, { type: blob.type || 'image/jpeg' });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      try { await navigator.share({ files: [file] }); return; }
+      catch (e) { if (e.name === 'AbortError') return; }
+    }
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  } catch (e) {
+    toast('保存失败：' + e.message);
+  }
+}
 function openPhotoMenu(i) {
   showLayer(`<div class="scrim" data-act="close"></div>
     <div class="sheet menu-sheet" role="dialog" aria-label="照片操作">
       <button data-act="ph-edit" data-i="${i}">放大 / 缩小 调整</button>
+      <button data-act="ph-save" data-i="${i}">下载图片</button>
       ${i > 0 ? `<button data-act="ph-cover" data-i="${i}">设为封面</button>` : ''}
       <button data-act="ph-replace" data-i="${i}">换一张</button>
       <button class="danger" data-act="ph-del" data-i="${i}">删除这张</button>
@@ -1600,7 +1623,7 @@ function episodeKeyOf(l) {
   const arr = logsFor(l.memberId, l.symptomId);
   let ep = 0;
   for (const x of arr) {
-    if (x.id === l.id) return l.symptomId + '#' + ep;
+    if (x.id === l.id) return l.memberId + '#' + l.symptomId + '#' + ep;
     if (x.healed) ep++;
   }
   return '';
@@ -1866,7 +1889,7 @@ function calHtml(id, anchor, view, filter) {
     <p class="cal-tip">浅色的点表示这几天还没好，只是没单独记录</p>
   </div>`;
 }
-function logRow(l, inEp) {
+function logRow(l, inEp, withMember) {
   const parts = summaryParts(l);
   const k = kindOf(l);
   const color = logColor(l);
@@ -1877,7 +1900,7 @@ function logRow(l, inEp) {
     <a class="log-main" href="#/log/${l.id}">
       ${mark}
       <div class="log-b">
-        <b>${dot(l.date).slice(5)}${inEp ? '' : ' ' + logTitle(l)}${l.healed ? '<span class="healed">已痊愈</span>' : ''}</b>
+        <b>${dot(l.date).slice(5)}${inEp ? '' : ' ' + logTitle(l)}${withMember && !inEp ? ` <span class="who">${esc((state.members.get(l.memberId) || {}).name || '')}</span>` : ''}${l.healed ? '<span class="healed">已痊愈</span>' : ''}</b>
         ${parts.map(p => `<span class="row-s"><b>${esc(p.label)}</b> ${esc(p.value)}</span>`).join('')}
         ${l.note ? `<span class="row-note">${esc(l.note)}</span>` : ''}
         ${(l.files || []).length ? `<span class="row-s accent-t">${svg(P.file, 13, 1.8)} ${l.files.length} 个文件</span>` : ''}
@@ -1886,7 +1909,7 @@ function logRow(l, inEp) {
     ${(l.photos || []).length ? `<button class="log-th-btn" data-act="log-photo" data-id="${l.id}" aria-label="看照片"><img class="log-th" src="${esc(l.photos[0])}" alt=""></button>` : ''}
   </div>`;
 }
-function episodeBlock(key, grp, open) {
+function episodeBlock(key, grp, open, withMember) {
   const first = grp[0].date <= grp[grp.length - 1].date ? grp[0] : grp[grp.length - 1];
   const dates = grp.map(l => l.date).sort();
   const from = dates[0], to = dates[dates.length - 1];
@@ -1899,17 +1922,17 @@ function episodeBlock(key, grp, open) {
     <button class="ep-head" data-act="ep-toggle" data-k="${esc(key)}">
       <span class="dot" style="background:${color};${done ? 'opacity:.5' : ''}"></span>
       <div class="ep-b">
-        <b>${esc(symName(first.symptomId))} ${span}</b>
+        <b>${withMember ? esc((state.members.get(first.memberId) || {}).name || '') : esc(symName(first.symptomId))} ${span}</b>
         <span>${grp.length} 条记录 · ${days} 天<em class="st-chip ${done ? 'ok' : 'no'}">${done ? '已痊愈' : '还没好'}</em></span>
       </div>
       ${thumbs.length ? `<span class="ep-th">${thumbs.map(p => `<img src="${esc(p)}" alt="">`).join('')}</span>` : ''}
       <span class="ep-caret">${svg(open ? P.up : P.down, 20)}</span>
     </button>
-    ${open ? `<div class="ep-kids">${grp.map(l => logRow(l, true)).join('')}</div>` : ''}
+    ${open ? `<div class="ep-kids">${grp.map(l => logRow(l, true, withMember)).join('')}</div>` : ''}
   </div>`;
 }
-function logsHtml(list) {
-  if (state.calDay) return list.map(l => logRow(l)).join('');
+function logsHtml(list, withMember) {
+  if (state.calDay) return list.map(l => logRow(l, false, withMember)).join('');
   const groups = [];
   const byKey = {};
   list.forEach(l => {
@@ -1926,10 +1949,10 @@ function logsHtml(list) {
     if (last > newestDate) { newestDate = last; newest = g.key; }
   });
   return groups.map(g => {
-    if (!g.key || g.rows.length < 2) return logRow(g.rows[0]);
+    if (!g.key || g.rows.length < 2) return logRow(g.rows[0], false, withMember);
     g.rows = g.rows.slice().sort((a, b) => a.date.localeCompare(b.date));
     const open = state.epOpen[g.key] === undefined ? (g.key === newest || g.key === state.epFocus) : state.epOpen[g.key];
-    return episodeBlock(g.key, g.rows, open);
+    return episodeBlock(g.key, g.rows, open, withMember);
   }).join('');
 }
 function viewMember(id) {
@@ -2065,6 +2088,10 @@ function viewSymptom(id) {
   const n = [...state.logs.values()].filter(l => l.symptomId === id).length;
   return topbar(backBtn('#/symptoms'), esc(sy.name), '') +
     `<main class="pad form">
+      <a class="mem" href="#/symlog/${id}" style="margin-bottom:14px">
+        <span class="sym-dot" style="background:${sy.color}"></span>
+        <div class="mem-b"><b>全部记录</b><small>${n} 条</small></div>
+        ${svg(P.chev, 20)}</a>
       <div class="card">
         <button class="line btn-line" data-act="sym-rename" data-id="${id}"><span>名字</span><span>${esc(sy.name)}</span></button>
         <div class="line"><span>颜色</span>
@@ -2161,7 +2188,6 @@ function viewLog(mode, arg) {
   return topbar(`<button class="text-btn" data-act="cancel-log" data-to="${cancel}">取消</button>`,
       `${esc(me.name)} · ${mode === 'new' ? '添加记录' : LOG_KINDS[lf.kind] + '记录'}`, '') +
     `<main class="pad form" style="padding-bottom:40px">
-      <input type="file" id="lcam-in" accept="image/*" capture="environment" hidden>
       <input type="file" id="lphoto-in" accept="image/*" hidden>
       <input type="file" id="lfile-in" hidden>
       ${kindSeg}
@@ -2351,6 +2377,28 @@ function sectionAdd(name, type) {
   closeLayer();
 }
 
+function viewSymLogs(id) {
+  const sy = state.symptoms.get(id);
+  if (!sy) return notFound();
+  const all = [...state.logs.values()].filter(l => l.symptomId === id && kindOf(l) === 'symptom')
+    .sort((a, b) => a.date.localeCompare(b.date));
+  const ids = [...new Set(all.map(l => l.memberId))].filter(m => state.members.get(m));
+  const pick = state.symMember && ids.includes(state.symMember) ? state.symMember : '';
+  let shown = pick ? all.filter(l => l.memberId === pick) : all;
+  if (!state.sortAsc) shown = shown.slice().reverse();
+  const chips = ids.length > 1 ? `<nav class="pills">
+      <button class="pill${pick ? '' : ' on'}" data-act="sym-member" data-v="">所有成员 ${all.length}</button>
+      ${ids.map(m => `<button class="pill${pick === m ? ' on' : ''}" data-act="sym-member" data-v="${m}">${esc((state.members.get(m) || {}).name || '')} ${all.filter(l => l.memberId === m).length}</button>`).join('')}
+    </nav>` : '';
+  const sortBtn = `<button class="icon-btn small" data-act="sort-toggle" aria-label="${state.sortAsc ? '改成从新到旧' : '改成从旧到新'}">${svg(state.sortAsc ? P.down : P.up, 20)}</button>`;
+  return topbar(backBtn('#/symptom/' + id), esc(sy.name) + '的记录', '') +
+    chips +
+    `<main class="pad" style="padding-top:6px">
+      <div class="sec-row"><h2 class="sec">共 ${shown.length} 条</h2>${sortBtn}</div>
+      ${shown.length ? `<div class="logs">${logsHtml(shown, !pick)}</div>` : '<p class="empty">还没有记录</p>'}
+    </main>`;
+}
+
 /* ---------- 路由与渲染 ---------- */
 function route() {
   return location.hash.replace(/^#\/?/, '').split('/').filter(Boolean).map(s => {
@@ -2374,12 +2422,14 @@ function renderView() {
     else if (a === 'member') html = viewMember(b);
     else if (a === 'symptoms') html = viewSymptoms();
     else if (a === 'symptom') html = viewSymptom(b);
+    else if (a === 'symlog') html = viewSymLogs(b);
     else if (a === 'log' && b === 'new') html = viewLog('new', c);
     else if (a === 'log') html = viewLog('edit', b);
     else if (a === 'settings') html = viewSettings();
     else html = notFound();
   }
   $app.innerHTML = html;
+  $app.querySelectorAll('textarea').forEach(grow);
 }
 function grow(t) {
   t.style.height = 'auto';
@@ -2390,7 +2440,6 @@ function render() {
   const fid = ae && ae.id && $app.contains(ae) ? ae.id : null;
   const y = window.scrollY;
   renderView();
-  $app.querySelectorAll('textarea').forEach(grow);
   window.scrollTo(0, y);
   requestAnimationFrame(() => window.scrollTo(0, y));
   if (fid) {
@@ -2438,9 +2487,20 @@ const actions = {
     const l = state.logs.get(el.dataset.id);
     if (l && (l.photos || []).length) openViewer(l.photos, 0);
   },
-  'photo-open': el => openViewer(form.photos, Number(el.dataset.i), 'photo-menu'),
+  'photo-open': el => openViewer(form.photos, Number(el.dataset.i), 'photo-open-menu'),
+  'photo-open-menu': el => {
+    const i = Number(el.dataset.i);
+    viewer = null;
+    closeLayer();
+    setTimeout(() => openPhotoMenu(i), 140);
+  },
   'lphoto-open': el => openViewer(lf.photos, Number(el.dataset.i), 'lphoto-open-menu'),
-  'lphoto-open-menu': el => { const i = Number(el.dataset.i); viewer = null; actions['lphoto-menu']({ dataset: { i } }); },
+  'lphoto-open-menu': el => {
+    const i = Number(el.dataset.i);
+    viewer = null;
+    closeLayer();
+    setTimeout(() => actions['lphoto-menu']({ dataset: { i } }), 140);
+  },
   'photo-menu': el => openPhotoMenu(Number(el.dataset.i)),
   'ph-edit': el => {
     const i = Number(el.dataset.i);
@@ -2520,14 +2580,12 @@ const actions = {
     const full = lf && lf.photos.length >= 3;
     showLayer(`<div class="scrim" data-act="close"></div>
       <div class="sheet menu-sheet" role="dialog" aria-label="加点什么">
-        ${full ? '<p>照片已经 3 张了，再加要先删一张</p>' : `
-          <button data-act="pick-cam"><span>拍照</span></button>
-          <button data-act="pick-lphoto"><span>从相册选</span></button>`}
+        ${full ? '<p>照片已经 3 张了，再加要先删一张</p>'
+          : '<button data-act="pick-lphoto"><span>照片</span></button>'}
         <button data-act="pick-lfile"><span>选文件（PDF 等）</span></button>
         <button data-act="close">取消</button>
       </div>`);
   },
-  'pick-cam': () => { photoPending = { target: 'log', mode: 'add' }; closeLayer(); document.getElementById('lcam-in').click(); },
   'pick-lphoto': () => { photoPending = { target: 'log', mode: 'add' }; closeLayer(); document.getElementById('lphoto-in').click(); },
   'pick-lfile': () => { closeLayer(); document.getElementById('lfile-in').click(); },
   'lphoto-menu': el => {
@@ -2535,6 +2593,7 @@ const actions = {
     showLayer(`<div class="scrim" data-act="close"></div>
       <div class="sheet menu-sheet" role="dialog" aria-label="照片操作">
         <button data-act="lph-edit" data-i="${i}">放大 / 缩小 调整</button>
+        <button data-act="lph-save" data-i="${i}">下载图片</button>
         <button data-act="lph-replace" data-i="${i}">换一张</button>
         <button class="danger" data-act="lph-del" data-i="${i}">删除这张</button>
         <button data-act="close">取消</button></div>`);
@@ -2549,6 +2608,17 @@ const actions = {
     document.getElementById('lphoto-in').click();
   },
   'noop2': () => {},
+  'ph-save': el => {
+    const i = Number(el.dataset.i);
+    closeLayer();
+    savePhoto(form.photos[i], `照片-${todayStr()}-${i + 1}.jpg`);
+  },
+  'lph-save': el => {
+    const i = Number(el.dataset.i);
+    const me = state.members.get(lf.memberId);
+    closeLayer();
+    savePhoto(lf.photos[i], `${(me && me.name) || '照片'}-${lf.date}-${i + 1}.jpg`);
+  },
   'lph-del': el => { lf.photos.splice(Number(el.dataset.i), 1); closeLayer(); render(); },
   'cal-move': el => {
     const step = Number(el.dataset.v);
@@ -2644,6 +2714,7 @@ const actions = {
     sy.color = decodeURIComponent(el.dataset.v);
     saveDoc('symptoms', sy);
   },
+  'sym-member': el => { state.symMember = el.dataset.v; render(); },
   'sym-heal': el => {
     const sy = clone(state.symptoms.get(el.dataset.id));
     sy.healTrack = el.dataset.v === '1';
@@ -2812,12 +2883,12 @@ document.addEventListener('keydown', e => {
 });
 document.addEventListener('change', async e => {
   const t = e.target;
-  if ((t.id === 'photo-in' || t.id === 'mphoto-in' || t.id === 'lphoto-in' || t.id === 'lcam-in') && t.files && t.files[0]) {
+  if ((t.id === 'photo-in' || t.id === 'mphoto-in' || t.id === 'lphoto-in') && t.files && t.files[0]) {
     const picked = t.files[0];
     const isImg = /^image\//.test(picked.type) || /\.(jpe?g|png|gif|webp|bmp|heic|heif)$/i.test(picked.name || '');
     if (!isImg) {
       t.value = '';
-      if ((t.id !== 'lphoto-in' && t.id !== 'lcam-in') || !lf) { toast('这里只能放照片'); return; }
+      if (t.id !== 'lphoto-in' || !lf) { toast('这里只能放照片'); return; }
       uploadFile(picked, meta => { if (lf) { lf.files.push(meta); render(); } });
       return;
     }
@@ -2865,6 +2936,7 @@ window.addEventListener('hashchange', () => {
   if (r[0] !== 'member' || (r[1] !== 'new' && r[1] !== 'edit')) mform = null;
   if (r[0] !== 'log') lf = null;
   if (r[0] !== 'symptom') tpl = null;
+  if (r[0] !== 'symlog') { state.symMember = ''; state.epOpen = {}; }
   if (r[0] !== 'member' && r[0] !== 'log') { state.cal = ''; state.calDay = ''; state.symFilter = ''; state.epOpen = {}; state.epFocus = ''; }
   state.search = '';
   state.searchOpen = false;
