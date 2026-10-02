@@ -160,6 +160,8 @@ button.tag{height:34px;padding:0 12px;font-size:14px;border-radius:10px;display:
 .btn.wide{width:100%;margin-top:14px;display:block}
 .hint{font-size:13px;color:var(--muted);margin:8px 4px 0}
 .field-l{font-size:14px;font-weight:500;color:var(--muted);margin:20px 4px 8px}
+.row-l{display:flex;align-items:center;justify-content:space-between}
+.row-l .link-btn{min-height:24px;padding:0;font-size:14px}
 
 .form .card{margin-top:16px}
 .photo-pick{width:100%;height:160px;border-radius:20px;border:1.5px dashed var(--line);background:var(--card);color:var(--muted);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;overflow:hidden;padding:0}
@@ -375,7 +377,7 @@ const BOXES = { cat: '猫用药', human: '人用药' };
 const REMIND_OPTIONS = [30, 60, 120];
 const LOG_TEXT = { add: '添加', in: '入库', use: '用完', open: '开封' };
 const FB_VER = '10.12.2';
-const APP_VER = '2026.10.02-67';
+const APP_VER = '2026.10.02-68';
 const MAX_PHOTOS = 6;
 const PHOTO_PX = 640;
 const PHOTO_Q = 0.62;
@@ -437,7 +439,7 @@ const P = {
   file: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/>',
   down: '<path d="M6 9l6 6 6-6"/>',
   vaccine: '<path d="M18 2l4 4"/><path d="M15.5 4.5l4 4"/><path d="M13 7l4 4-8 8H5v-4z"/><path d="M11 9l2 2"/>',
-  deworm: '<path d="M12 3l8 3v6c0 4.5-3.4 8-8 9-4.6-1-8-4.5-8-9V6z"/><path d="M9 12l2 2 4-4"/>',
+  deworm: '<path d="M12 3l8 3v6c0 4.5-3.4 8-8 9-4.6-1-8-4.5-8-9V6z" fill="currentColor"/><path d="M8.6 12.2l2.4 2.4 4.4-4.6" stroke="#fff" stroke-width="2.4"/>',
   visit: '<path d="M4 21V9.5L12 4l8 5.5V21z"/><path d="M12 11v6M9 14h6"/>',
   up: '<path d="M6 15l6-6 6 6"/>'
 };
@@ -954,40 +956,36 @@ function doIn() {
 }
 
 /* ---------- 日历提醒 ---------- */
-function icsFor(m, exp) {
-  const rd = addDays(exp, -m.remindDays);
-  const d1 = rd.replace(/-/g, '');
-  const d2 = addDays(rd, 1).replace(/-/g, '');
+const CAL_TIME = '220000';
+function icsEvent(o) {
+  const d = o.date.replace(/-/g, '');
   const now = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
-  const e = s => String(s).replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\n/g, '\\n');
-  const title = `药品快过期：${m.name}`;
-  const desc = `${BOXES[m.box]}「${m.name}」将于 ${dot(exp)} 过期。`;
+  const e = x => String(x).replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\n/g, '\\n');
   return [
     'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//yaoxiang//CN', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH',
-    'BEGIN:VEVENT',
-    `UID:${m.id}-${exp}-${m.remindDays}@yaoxiang`,
-    `DTSTAMP:${now}`,
-    `DTSTART;VALUE=DATE:${d1}`,
-    `DTEND;VALUE=DATE:${d2}`,
-    `SUMMARY:${e(title)}`,
-    `DESCRIPTION:${e(desc)}`,
-    'BEGIN:VALARM', 'ACTION:DISPLAY', `DESCRIPTION:${e(title)}`, 'TRIGGER:PT9H', 'END:VALARM',
+    'BEGIN:VEVENT', `UID:${o.uid}@yaoxiang`, `DTSTAMP:${now}`,
+    `DTSTART:${d}T${CAL_TIME}`, `DTEND:${d}T221500`,
+    `SUMMARY:${e(o.title)}`, `DESCRIPTION:${e(o.desc)}`,
+    'BEGIN:VALARM', 'ACTION:DISPLAY', `DESCRIPTION:${e(o.title)}`, 'TRIGGER:PT0M', 'END:VALARM',
     'END:VEVENT', 'END:VCALENDAR', ''
   ].join('\r\n');
+}
+function downloadIcs(name, text) {
+  const blob = new Blob([text], { type: 'text/calendar' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = name.replace(/[\\/:*?"<>|]/g, '_');
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+}
+function icsFor(m, exp) {
+  return icsEvent({ uid: `${m.id}-${exp}-${m.remindDays}`, date: addDays(exp, -m.remindDays),
+    title: `药品快过期：${m.name}`, desc: `${BOXES[m.box]}「${m.name}」将于 ${dot(exp)} 过期。` });
 }
 function addToCalendar(m, exp) {
   const rd = addDays(exp, -m.remindDays);
   if (daysUntil(rd) < 0) { toast('已经在提醒期内，不用再加提醒'); return; }
-  const name = `${m.name}-${exp}.ics`.replace(/[\\/:*?"<>|]/g, '_');
-  const blob = new Blob([icsFor(m, exp)], { type: 'text/calendar' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = name;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 60000);
+  downloadIcs(`${m.name}-${exp}.ics`, icsFor(m, exp));
 }
 function afterNav(fn) {
   let done = false;
@@ -1083,7 +1081,7 @@ function askCalendar(m, exp) {
   showLayer(`<div class="scrim" data-act="close"></div>
     <div class="sheet" role="dialog" aria-label="日历提醒">
       <h2 class="sheet-t">加到日历提醒？</h2>
-      <p>会在 ${dot(rd)} 上午 9 点提醒：${esc(m.name)} 将于 ${dot(exp)} 过期。</p>
+      <p>会在 ${dot(rd)} 晚上 10 点提醒：${esc(m.name)} 将于 ${dot(exp)} 过期。</p>
       <div class="actions2">
         <button class="btn" data-act="close">以后再说</button>
         <button class="btn primary" data-act="cal" data-id="${m.id}" data-exp="${exp}">加到日历</button>
@@ -1159,7 +1157,7 @@ function remindHint() {
   const exps = formExps();
   if (!exps.length) return '过期日期可以先不填，之后在详情页补上';
   const rd = addDays(exps[0], -form.remindDays);
-  return daysUntil(rd) < 0 ? '已经在提醒期内了，不会再加日历提醒' : `将在 ${dot(rd)} 上午 9 点通过日历提醒你`;
+  return daysUntil(rd) < 0 ? '已经在提醒期内了，不会再加日历提醒' : `将在 ${dot(rd)} 晚上 10 点通过日历提醒你`;
 }
 function commitTag() {
   const t = form.tagDraft.replace(/[#＃,，\s]/g, '');
@@ -1768,7 +1766,11 @@ function summaryParts(l) {
     const due = vacDue(l);
     return due ? [{ label: '有效期', value: `${l.years} 年，${dot(due)} 到期` }] : [];
   }
-  if (kindOf(l) === 'visit') return [];
+  if (kindOf(l) === 'visit') {
+    if (!l.revisit) return [];
+    const dd = daysUntil(l.revisit);
+    return [{ label: '复诊', value: `${dot(l.revisit)}${dd >= 0 ? `（还有 ${dd} 天）` : ''}` }];
+  }
   if (kindOf(l) === 'deworm') {
     if (!l.rpt || !l.rpt.unit) return [];
     const nx = nextDue(l.date, l.rpt);
@@ -2218,6 +2220,11 @@ function viewSymptoms() {
       ${syms.length ? `<div class="mems">${rows}</div>` : '<p class="hint" style="text-align:center">还没有症状</p>'}
       <button class="btn wide addbtn" data-act="new-sym-page">${svg(P.plus, 20, 2.2)}新症状</button>
       <p class="hint">症状是所有成员共用的。在这里改了板块和选项，之后每条记录都按这个样子来。</p>
+      <h2 class="sec" style="margin-top:28px">就诊 · 疫苗 · 驱虫的选项</h2>
+      <div class="mems">${Object.entries(ML).map(([k, o]) => `<button class="mem" data-act="ml-open" data-v="${k}" style="width:100%;text-align:left;border:0;font:inherit">
+        <span class="kicon" style="color:${keyColor(o.kind)}">${svg(P[o.kind], 20, 2)}</span>
+        <div class="mem-b"><b>${o.title}</b><small>${mlItems(k).length} 项</small></div>
+        ${svg(P.chev, 20)}</button>`).join('')}</div>
     </main>`;
 }
 function viewSymptom(id) {
@@ -2259,7 +2266,7 @@ function viewLog(mode, arg) {
       const first = [...state.symptoms.values()][0];
       lf = { key, kind: 'symptom', memberId: arg, symptomId: first ? first.id : '',
         date: state.calDay || todayStr(), values: {}, photos: [], files: [], note: '', healed: false,
-        vacName: '', years: 1, remindDays: 60, place: '',
+        vacName: '', years: 1, remindDays: 60, place: '', revisit: '',
         dwType: 'external', dwProduct: '', rpt: null };
     } else {
       const l = state.logs.get(arg);
@@ -2267,7 +2274,7 @@ function viewLog(mode, arg) {
       lf = { key, id: l.id, kind: kindOf(l), memberId: l.memberId, symptomId: l.symptomId, date: l.date,
         values: clone(l.values || {}), photos: (l.photos || []).slice(), files: clone(l.files || []), note: l.note || '',
         healed: !!l.healed, vacName: l.vacName || '', years: l.years || 1,
-        remindDays: l.remindDays || 60, place: l.place || '', createdAt: l.createdAt,
+        remindDays: l.remindDays || 60, place: l.place || '', revisit: l.revisit || '', createdAt: l.createdAt,
         dwType: l.dwType || 'external', dwProduct: l.dwProduct || '', rpt: l.rpt ? clone(l.rpt) : null };
     }
   }
@@ -2284,6 +2291,7 @@ function viewLog(mode, arg) {
     ${syms.map(s => `<button class="opt-chip${s.id === lf.symptomId ? ' on' : ''}" data-act="pick-sym" data-v="${s.id}" style="${s.id === lf.symptomId ? `background:${s.color};border-color:${s.color};color:${textOn(s.color)}` : ''}">${esc(s.name)}</button>`).join('')}
     <button class="opt-chip add" data-act="new-sym">+ 新症状</button></div>`;
 
+  const manageL = (label, key) => `<div class="field-l row-l"><span>${label}</span><button class="link-btn" data-act="ml-open" data-v="${key}">管理</button></div>`;
   const pickList = (listName, cur, act) => {
     const opts = [...new Set([...listItems(listName), ...(cur ? [cur] : [])])];
     return `<div class="quick">
@@ -2294,7 +2302,7 @@ function viewLog(mode, arg) {
   const due = lf.kind === 'vaccine' && lf.date ? vacDue({ date: lf.date, years: lf.years }) : '';
   const remindOn = due ? addDays(due, -lf.remindDays) : '';
   const vacBody = `
-    <div class="field-l">打的什么疫苗</div>
+    ${manageL('打的什么疫苗', 'vac')}
     ${pickList(VAC_LIST, lf.vacName, 'vac-pick')}
     <div class="card" style="margin-top:16px">
       <div class="line"><span>有效期</span>
@@ -2313,8 +2321,12 @@ function viewLog(mode, arg) {
     ${due ? `<p class="hint">${dot(due)} 到期，会在 ${dot(remindOn)} 提醒你</p>` : ''}`;
 
   const visitBody = `
-    <div class="field-l">去了哪里</div>
-    ${pickList(PLACE_LIST, lf.place, 'place-pick')}`;
+    ${manageL('去了哪里', 'place')}
+    ${pickList(PLACE_LIST, lf.place, 'place-pick')}
+    <div class="card" style="margin-top:16px">
+      <label class="line"><span>下次复诊</span><input data-lf="revisit" type="date" value="${lf.revisit || ''}" min="${lf.date || ''}"></label>
+    </div>
+    ${lf.revisit ? `<p class="hint">不用复诊就把日期清空。日历会在前一天晚上 10 点提醒</p>` : '<p class="hint">可以不填</p>'}`;
 
   const rp = lf.rpt;
   const nx = lf.kind === 'deworm' && rp ? nextDue(lf.date, rp) : '';
@@ -2323,7 +2335,7 @@ function viewLog(mode, arg) {
     <div class="field-l">体内还是体外</div>
     <div class="seg2">${Object.entries(DW_TYPES).map(([k, l]) =>
       `<button data-act="dw-type" data-v="${k}" class="${lf.dwType === k ? 'on' : ''}">${l}</button>`).join('')}</div>
-    <div class="field-l">用的什么</div>
+    ${manageL('用的什么', 'dw-' + lf.dwType)}
     <div class="quick">
       ${dwOpts.map(o => `<button class="opt-chip${o === lf.dwProduct ? ' on' : ''}" data-act="dw-pick" data-v="${esc(o)}">${o === lf.dwProduct ? svg(P.check, 15, 2.6) : ''}${esc(o)}</button>`).join('')}
       <button class="opt-chip add" data-act="dw-pick-add">+ 加一项</button>
@@ -2378,6 +2390,7 @@ function viewLog(mode, arg) {
         ${sections}
         ${sym ? `<button class="btn wide addbtn" data-act="sec-add">${svg(P.plus, 20, 2.2)}加一个板块</button>` : '<p class="hint">先选一个症状，下面才会出现要填的内容</p>'}`
         : lf.kind === 'vaccine' ? vacBody : lf.kind === 'deworm' ? dwBody : visitBody}
+      ${lf.id ? calCardHtml() : ''}
       <div class="field-l">备注</div>
       <textarea id="lf-note" class="note-input" data-lf="note" rows="3" placeholder="随便写点什么">${esc(lf.note)}</textarea>
       <div class="field-l">照片和文件</div>
@@ -2387,11 +2400,8 @@ function viewLog(mode, arg) {
       ${lf.id ? '<button class="btn danger wide" data-act="del-log">删除这条记录</button>' : ''}
     </main>`;
 }
-function saveLog() {
+function buildLog() {
   const k = lf.kind || 'symptom';
-  if (k === 'symptom' && !lf.symptomId) { toast('先选一个症状'); return; }
-  if (k === 'vaccine' && !lf.vacName) { toast('先填疫苗名字'); return; }
-  if (k === 'deworm' && !lf.dwProduct) { toast('先选用的什么'); return; }
   const l = {
     id: lf.id || uid(), kind: k, memberId: lf.memberId,
     date: lf.date || todayStr(), photos: lf.photos, files: lf.files, note: lf.note.trim(),
@@ -2413,83 +2423,88 @@ function saveLog() {
     l.remindDays = Number(lf.remindDays) || 60;
   } else {
     l.place = lf.place || '';
+    l.revisit = lf.revisit && lf.revisit > l.date ? lf.revisit : '';
   }
+  return l;
+}
+/* 这条记录能加的日历提醒：{ date: 提醒那天, text: 说明, ics, name } */
+function logCal(l, me) {
+  const k = kindOf(l);
+  if (k === 'vaccine' && l.vacName && l.date) {
+    const due = vacDue(l);
+    const rd = addDays(due, -l.remindDays);
+    return { date: rd, text: `${dot(due)} 到期，${dot(rd)} 晚上 10 点提醒`, ics: () => vaccineIcs(l, me), name: `${l.vacName}-${due}.ics` };
+  }
+  if (k === 'deworm' && l.rpt && l.dwProduct) {
+    const nx = nextDue(l.date, l.rpt);
+    if (!nx) return null;
+    return { date: nx, text: `下次 ${dot(nx)} 星期${WEEK[parseYmd(nx).getDay()]}，当天晚上 10 点提醒`, ics: () => dwIcs(l, me), name: `驱虫-${nx}.ics` };
+  }
+  if (k === 'visit' && l.revisit) {
+    const rd = addDays(l.revisit, -1);
+    return { date: rd, text: `${dot(l.revisit)} 复诊，前一天晚上 10 点提醒`, ics: () => revisitIcs(l, me), name: `复诊-${l.revisit}.ics` };
+  }
+  return null;
+}
+function calCardHtml() {
+  if (lf.kind === 'symptom') return '';
+  const c = logCal(buildLog(), state.members.get(lf.memberId));
+  const why = lf.kind === 'visit' ? '填了下次复诊日期，就能加日历提醒'
+    : lf.kind === 'deworm' ? '设置了重复，就能把下次加到日历' : '选好疫苗，就能加日历提醒';
+  if (!c) return `<div class="field-l">日历提醒</div><p class="hint" style="margin-top:0">${why}</p>`;
+  const past = daysUntil(c.date) < 0;
+  return `<div class="field-l">日历提醒</div>
+    <button class="btn wide" data-act="log-cal"${past ? ' disabled' : ''}>${svg(P.cal, 18, 2)}${past ? '提醒日期已经过了' : '加到日历'}</button>
+    <p class="hint">${c.text}</p>`;
+}
+function saveLog() {
+  const k = lf.kind || 'symptom';
+  if (k === 'symptom' && !lf.symptomId) { toast('先选一个症状'); return; }
+  if (k === 'vaccine' && !lf.vacName) { toast('先填疫苗名字'); return; }
+  if (k === 'deworm' && !lf.dwProduct) { toast('先选用的什么'); return; }
+  const l = buildLog();
   if (tooBig(l)) return;
+  const old = lf.id ? state.logs.get(lf.id) : null;
+  const oldCal = old ? logCal(old, null) : null;
   const to = '#/member/' + l.memberId;
   const me = state.members.get(l.memberId);
   lf = null;
   saveDoc('logs', l);
   if (cameFrom === to) history.back(); else goReplace(to);
   toast('已保存');
-  if (k === 'vaccine') {
-    const due = vacDue(l);
-    const rd = addDays(due, -l.remindDays);
-    if (daysUntil(rd) >= 0) afterNav(() => askVaccineCal(l, me));
-  }
-  if (k === 'deworm' && l.rpt) {
-    const nx = nextDue(l.date, l.rpt);
-    if (nx && daysUntil(nx) >= 0) afterNav(() => askDwCal(l, me));
-  }
+  const c = logCal(l, me);
+  if (c && daysUntil(c.date) >= 0 && !(oldCal && oldCal.date === c.date && oldCal.text === c.text)) afterNav(() => askLogCal(l, me));
 }
-function askDwCal(l, me) {
-  const nx = nextDue(l.date, l.rpt);
+function askLogCal(l, me) {
+  const c = logCal(l, me);
+  if (!c) return;
+  const k = kindOf(l);
+  const what = k === 'vaccine' ? `${esc(l.vacName)}：` : k === 'deworm' ? `${DW_TYPES[l.dwType]}驱虫${rptText(l.rpt)}，` : '';
   showLayer(`<div class="scrim" data-act="close"></div>
-    <div class="sheet" role="dialog" aria-label="驱虫提醒">
-      <h2 class="sheet-t">把下次加到日历？</h2>
-      <p>${esc(me ? me.name : '')} 下次${DW_TYPES[l.dwType]}驱虫是 ${dot(nx)} 星期${WEEK[parseYmd(nx).getDay()]}，当天上午 9 点提醒。</p>
+    <div class="sheet" role="dialog" aria-label="日历提醒">
+      <h2 class="sheet-t">加个日历提醒？</h2>
+      <p>${esc(me ? me.name : '')} ${what}${c.text}。</p>
       <div class="actions2">
         <button class="btn" data-act="close">以后再说</button>
-        <button class="btn primary" data-act="dw-cal" data-id="${l.id}">加到日历</button>
+        <button class="btn primary" data-act="saved-cal" data-id="${l.id}">加到日历</button>
       </div></div>`);
 }
 function dwIcs(l, me) {
   const nx = nextDue(l.date, l.rpt);
-  const d1 = nx.replace(/-/g, '');
-  const d2 = addDays(nx, 1).replace(/-/g, '');
-  const now = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
-  const e = x => String(x).replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\n/g, '\\n');
-  const who = me ? me.name : '';
-  const title = `${who} ${DW_TYPES[l.dwType]}驱虫：${l.dwProduct}`;
-  const desc = `上次 ${dot(l.date)}，${rptText(l.rpt)}。`;
-  return [
-    'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//yaoxiang//CN', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH',
-    'BEGIN:VEVENT', `UID:${l.id}-dw-${nx}@yaoxiang`, `DTSTAMP:${now}`,
-    `DTSTART;VALUE=DATE:${d1}`, `DTEND;VALUE=DATE:${d2}`,
-    `SUMMARY:${e(title)}`, `DESCRIPTION:${e(desc)}`,
-    'BEGIN:VALARM', 'ACTION:DISPLAY', `DESCRIPTION:${e(title)}`, 'TRIGGER:PT9H', 'END:VALARM',
-    'END:VEVENT', 'END:VCALENDAR', ''
-  ].join('\r\n');
-}
-function askVaccineCal(l, me) {
-  const due = vacDue(l);
-  const rd = addDays(due, -l.remindDays);
-  showLayer(`<div class="scrim" data-act="close"></div>
-    <div class="sheet" role="dialog" aria-label="疫苗提醒">
-      <h2 class="sheet-t">加个日历提醒？</h2>
-      <p>${esc(me ? me.name : '')} 的 ${esc(l.vacName)} ${dot(due)} 到期，会在 ${dot(rd)} 上午 9 点提醒。</p>
-      <div class="actions2">
-        <button class="btn" data-act="close">以后再说</button>
-        <button class="btn primary" data-act="vac-cal" data-id="${l.id}">加到日历</button>
-      </div></div>`);
+  return icsEvent({ uid: `${l.id}-dw-${nx}`, date: nx,
+    title: `${me ? me.name : ''} ${DW_TYPES[l.dwType]}驱虫：${l.dwProduct}`,
+    desc: `上次 ${dot(l.date)}，${rptText(l.rpt)}。` });
 }
 function vaccineIcs(l, me) {
   const due = vacDue(l);
-  const rd = addDays(due, -l.remindDays);
-  const d1 = rd.replace(/-/g, '');
-  const d2 = addDays(rd, 1).replace(/-/g, '');
-  const now = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
-  const e = x => String(x).replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\n/g, '\\n');
-  const who = me ? me.name : '';
-  const title = `疫苗到期：${who} ${l.vacName}`;
-  const desc = `${dot(l.date)} 打的 ${l.vacName}，${l.years} 年有效，${dot(due)} 到期。`;
-  return [
-    'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//yaoxiang//CN', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH',
-    'BEGIN:VEVENT', `UID:${l.id}-vac@yaoxiang`, `DTSTAMP:${now}`,
-    `DTSTART;VALUE=DATE:${d1}`, `DTEND;VALUE=DATE:${d2}`,
-    `SUMMARY:${e(title)}`, `DESCRIPTION:${e(desc)}`,
-    'BEGIN:VALARM', 'ACTION:DISPLAY', `DESCRIPTION:${e(title)}`, 'TRIGGER:PT9H', 'END:VALARM',
-    'END:VEVENT', 'END:VCALENDAR', ''
-  ].join('\r\n');
+  return icsEvent({ uid: `${l.id}-vac`, date: addDays(due, -l.remindDays),
+    title: `疫苗到期：${me ? me.name : ''} ${l.vacName}`,
+    desc: `${dot(l.date)} 打的 ${l.vacName}，${l.years} 年有效，${dot(due)} 到期。` });
+}
+function revisitIcs(l, me) {
+  return icsEvent({ uid: `${l.id}-rv-${l.revisit}`, date: addDays(l.revisit, -1),
+    title: `明天复诊：${me ? me.name : ''}${l.place ? ' · ' + l.place : ''}`,
+    desc: `${dot(l.revisit)} 复诊${l.place ? '（' + l.place + '）' : ''}。上次就诊 ${dot(l.date)}。` });
 }
 function delLog() {
   if (!confirm('删除这条记录？')) return;
@@ -2579,6 +2594,50 @@ function manageSection(secId) {
         <div class="quick" style="padding-bottom:8px">${fromBox.map(n => `<button class="opt-chip add" data-act="opt-from-box" data-sec="${sec.id}" data-v="${esc(n)}">+ ${esc(n)}</button>`).join('')}</div>` : ''}
       <button class="danger" data-act="sec-del" data-sec="${sec.id}">删除整个板块</button>
       <button data-act="close">完成</button>
+    </div>`);
+}
+/* ---------- 就诊地点 / 疫苗 / 驱虫产品 的选项管理 ---------- */
+const ML = {
+  place: { list: PLACE_LIST, title: '就诊地点', field: 'place', kind: 'visit' },
+  vac: { list: VAC_LIST, title: '疫苗', field: 'vacName', kind: 'vaccine' },
+  'dw-internal': { list: DW_LIST.internal, title: '体内驱虫用的', field: 'dwProduct', kind: 'deworm', dw: 'internal' },
+  'dw-external': { list: DW_LIST.external, title: '体外驱虫用的', field: 'dwProduct', kind: 'deworm', dw: 'external' }
+};
+const mlItems = key => ML[key].dw ? dwItems(ML[key].dw) : listItems(ML[key].list);
+function mlSave(key, items) {
+  const found = listByName(ML[key].list);
+  const l = found ? clone(found) : { id: uid(), name: ML[key].list, items: [] };
+  l.items = items;
+  saveDoc('lists', l);
+}
+const mlUses = (key, v) => [...state.logs.values()].filter(l => kindOf(l) === ML[key].kind &&
+  l[ML[key].field] === v && (!ML[key].dw || l.dwType === ML[key].dw));
+let mlCur = null;
+function openListManage(key) {
+  mlCur = key;
+  const items = mlItems(key);
+  showLayer(`<div class="scrim" data-act="close"></div>
+    <div class="sheet menu-sheet" role="dialog" aria-label="管理${ML[key].title}">
+      <h2 class="sheet-t">${ML[key].title}</h2>
+      ${items.length ? items.map((o, i) => `<button data-act="ml-item" data-i="${i}"><span>${esc(o)}</span><span class="muted">${mlUses(key, o).length} 条记录 · 改</span></button>`).join('')
+        : '<p>还没有选项</p>'}
+      <button data-act="ml-add"><span class="accent-t">+ 加一项</span></button>
+      <button data-act="close">完成</button>
+    </div>`);
+}
+function openListItem(i) {
+  const key = mlCur;
+  const v = mlItems(key)[i];
+  if (v == null) return;
+  const n = mlUses(key, v).length;
+  showLayer(`<div class="scrim" data-act="close"></div>
+    <div class="sheet menu-sheet" role="dialog" aria-label="${esc(v)}">
+      <h2 class="sheet-t">${esc(v)}</h2>
+      ${n ? `<p>有 ${n} 条记录用了它。改名会一起改；删除只是从选项里拿掉，那些记录不变。</p>` : ''}
+      <button data-act="ml-ren" data-i="${i}"><span>改名</span></button>
+      ${i > 0 ? `<button data-act="ml-up" data-i="${i}"><span>往前挪</span></button>` : ''}
+      <button data-act="ml-del" data-i="${i}"><span class="danger">从选项里删除</span></button>
+      <button data-act="ml-back">返回</button>
     </div>`);
 }
 function sectionAdd(name, type) {
@@ -3069,31 +3128,57 @@ const actions = {
   },
   'rpt-n': el => { lf.rpt.every = Math.max(1, Number(lf.rpt.every) + Number(el.dataset.v)); render(); },
   'rpt-wd': el => { lf.rpt.weekday = Number(el.dataset.v); render(); },
-  'dw-cal': el => {
+  'ml-open': el => openListManage(el.dataset.v),
+  'ml-back': () => openListManage(mlCur),
+  'ml-item': el => openListItem(Number(el.dataset.i)),
+  'ml-add': () => {
+    const key = mlCur;
+    askText('加一项：' + ML[key].title, '写上名字', v => {
+      const items = mlItems(key);
+      if (!items.includes(v)) items.push(v);
+      mlSave(key, items);
+      openListManage(key);
+    });
+  },
+  'ml-ren': el => {
+    const key = mlCur, i = Number(el.dataset.i);
+    const old = mlItems(key)[i];
+    askText('改名：' + old, old, v => {
+      if (v === old) { openListManage(key); return; }
+      const items = mlItems(key);
+      if (items.includes(v)) items.splice(i, 1); else items[i] = v;
+      mlSave(key, items);
+      mlUses(key, old).forEach(l => { const x = clone(l); x[ML[key].field] = v; saveDoc('logs', x); });
+      if (lf && lf[ML[key].field] === old) lf[ML[key].field] = v;
+      openListManage(key);
+    });
+    const inp = document.getElementById('ask-in');
+    if (inp) { inp.value = old; ask.value = old; }
+  },
+  'ml-up': el => {
+    const key = mlCur, i = Number(el.dataset.i);
+    const items = mlItems(key);
+    [items[i - 1], items[i]] = [items[i], items[i - 1]];
+    mlSave(key, items);
+    openListManage(key);
+  },
+  'ml-del': el => {
+    const key = mlCur, i = Number(el.dataset.i);
+    const items = mlItems(key);
+    items.splice(i, 1);
+    mlSave(key, items);
+    openListManage(key);
+  },
+  'saved-cal': el => {
     const l = state.logs.get(el.dataset.id);
-    if (!l) { closeLayer(); return; }
-    const me = state.members.get(l.memberId);
-    const name = `驱虫-${nextDue(l.date, l.rpt)}.ics`;
-    const blob = new Blob([dwIcs(l, me)], { type: 'text/calendar' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = name;
-    document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 60000);
+    const c = l ? logCal(l, state.members.get(l.memberId)) : null;
+    if (c) downloadIcs(c.name, c.ics());
     closeLayer();
   },
-  'vac-cal': el => {
-    const l = state.logs.get(el.dataset.id);
-    if (!l) { closeLayer(); return; }
-    const me = state.members.get(l.memberId);
-    const name = `${l.vacName}-${vacDue(l)}.ics`.replace(/[\\/:*?"<>|]/g, '_');
-    const blob = new Blob([vaccineIcs(l, me)], { type: 'text/calendar' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = name;
-    document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 60000);
-    closeLayer();
+  'log-cal': () => {
+    if (!lf) return;
+    const c = logCal(buildLog(), state.members.get(lf.memberId));
+    if (c) downloadIcs(c.name, c.ics());
   },
   'save-log': saveLog,
   'del-log': delLog,
@@ -3137,7 +3222,7 @@ document.addEventListener('input', e => {
   if (t.dataset.lf && lf) {
     lf[t.dataset.lf] = t.value;
     if (t.tagName === 'TEXTAREA') grow(t);
-    else if (t.dataset.lf === 'date' && (lf.kind === 'vaccine' || lf.kind === 'deworm')) render();
+    else if ((t.dataset.lf === 'date' && lf.kind !== 'symptom') || t.dataset.lf === 'revisit') render();
     return;
   }
   if (t.dataset.sec && lf) { lf.values[t.dataset.sec] = t.value; return; }
