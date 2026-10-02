@@ -160,8 +160,9 @@ button.tag{height:34px;padding:0 12px;font-size:14px;border-radius:10px;display:
 .btn.danger{color:var(--bad);background:none;border-color:transparent}
 .btn.wide{width:100%;margin-top:14px;display:block}
 .hint{font-size:13px;color:var(--muted);margin:8px 4px 0}
-.field-l{font-size:14px;font-weight:500;color:var(--muted);margin:20px 4px 8px}
-.row-l{display:flex;align-items:center;justify-content:space-between}
+.field-l{font-size:14px;font-weight:500;color:var(--muted);margin:22px 4px 10px;display:flex;align-items:center;gap:10px}
+.field-l::after,.sec-head::after{content:'';flex:1;height:1px;background:var(--line);order:1}
+.field-l>:not(:first-child),.sec-head>:not(:first-child){order:2}
 .row-l .link-btn{min-height:24px;padding:0;font-size:14px}
 
 .form .card{margin-top:16px}
@@ -322,7 +323,7 @@ button.tag{height:34px;padding:0 12px;font-size:14px;border-radius:10px;display:
 .log-th{width:52px;height:52px;border-radius:12px;object-fit:cover;flex-shrink:0}
 .pill .dot{width:8px;height:8px;border-radius:4px;margin-right:6px}
 .sec-block{margin-top:18px}
-.sec-head{display:flex;align-items:center;justify-content:space-between;margin:0 4px 8px}
+.sec-head{display:flex;align-items:center;gap:10px;margin:0 4px 8px}
 .sec-head span{font-size:14px;font-weight:500;color:var(--muted)}
 .sec-head .link-btn{min-height:28px;font-size:13px}
 .sec-tools{display:flex;align-items:center;gap:2px}
@@ -378,7 +379,7 @@ const BOXES = { cat: '猫用药', human: '人用药' };
 const REMIND_OPTIONS = [30, 60, 120];
 const LOG_TEXT = { add: '添加', in: '入库', use: '用完', open: '开封' };
 const FB_VER = '10.12.2';
-const APP_VER = '2026.10.02-69';
+const APP_VER = '2026.10.02-70';
 const MAX_PHOTOS = 6;
 const PHOTO_PX = 640;
 const PHOTO_Q = 0.62;
@@ -2306,7 +2307,7 @@ function viewLog(mode, arg) {
   const due = lf.kind === 'vaccine' && lf.date ? vacDue({ date: lf.date, years: lf.years }) : '';
   const remindOn = due ? addDays(due, -lf.remindDays) : '';
   const vacBody = `
-    ${manageL('打的什么疫苗', 'vac')}
+    ${manageL('疫苗', 'vac')}
     ${pickList(VAC_LIST, lf.vacName, 'vac-pick')}
     <div class="card" style="margin-top:16px">
       <div class="line"><span>有效期</span>
@@ -2322,24 +2323,24 @@ function viewLog(mode, arg) {
         </div>
       </div>
     </div>
-    ${due ? `<p class="hint">${dot(due)} 到期，会在 ${dot(remindOn)} 提醒你</p>` : ''}`;
+    ${due ? `<p class="hint">${dot(due)} 到期${lf.id ? '' : `，会在 ${dot(remindOn)} 提醒你`}</p>` : ''}`;
 
   const visitBody = `
-    ${manageL('去了哪里', 'place')}
+    ${manageL('医院名称', 'place')}
     ${pickList(PLACE_LIST, lf.place, 'place-pick')}
     <div class="card" style="margin-top:16px">
       <label class="line"><span>下次复诊</span><input data-lf="revisit" type="date" value="${lf.revisit || ''}" min="${lf.date || ''}"></label>
     </div>
-    ${lf.revisit ? `<p class="hint">不用复诊就把日期清空。日历会在前一天晚上 10 点提醒</p>` : '<p class="hint">可以不填</p>'}`;
+    ${lf.revisit ? `<p class="hint">不用复诊就把日期清空</p>` : '<p class="hint">可以不填</p>'}`;
 
   const rp = lf.rpt;
   const nx = lf.kind === 'deworm' && rp ? nextDue(lf.date, rp) : '';
   const dwOpts = [...new Set([...dwItems(lf.dwType), ...(lf.dwProduct ? [lf.dwProduct] : [])])];
   const dwBody = `
-    <div class="field-l">体内还是体外</div>
+    <div class="field-l">类型</div>
     <div class="seg2">${Object.entries(DW_TYPES).map(([k, l]) =>
       `<button data-act="dw-type" data-v="${k}" class="${lf.dwType === k ? 'on' : ''}">${l}</button>`).join('')}</div>
-    ${manageL('用的什么', 'dw-' + lf.dwType)}
+    ${manageL(DW_TYPES[lf.dwType] + '驱虫', 'dw-' + lf.dwType)}
     <div class="quick">
       ${dwOpts.map(o => `<button class="opt-chip${o === lf.dwProduct ? ' on' : ''}" data-act="dw-pick" data-v="${esc(o)}">${o === lf.dwProduct ? svg(P.check, 15, 2.6) : ''}${esc(o)}</button>`).join('')}
       <button class="opt-chip add" data-act="dw-pick-add">+ 加一项</button>
@@ -2437,16 +2438,16 @@ function logCal(l, me) {
   if (k === 'vaccine' && l.vacName && l.date) {
     const due = vacDue(l);
     const rd = addDays(due, -l.remindDays);
-    return { date: rd, text: `${dot(due)} 到期，${dot(rd)} 晚上 10 点提醒`, ics: () => vaccineIcs(l, me), name: `${l.vacName}-${due}.ics` };
+    return { date: rd, remind: `${dot(rd)} 晚上 10 点提醒`, text: `${dot(due)} 到期，${dot(rd)} 晚上 10 点提醒`, ics: () => vaccineIcs(l, me), name: `${l.vacName}-${due}.ics` };
   }
   if (k === 'deworm' && l.rpt && l.dwProduct) {
     const nx = nextDue(l.date, l.rpt);
     if (!nx) return null;
-    return { date: nx, text: `下次 ${dot(nx)} 星期${WEEK[parseYmd(nx).getDay()]}，当天晚上 10 点提醒`, ics: () => dwIcs(l, me), name: `驱虫-${nx}.ics` };
+    return { date: nx, remind: `${dot(nx)} 晚上 10 点提醒`, text: `下次 ${dot(nx)} 星期${WEEK[parseYmd(nx).getDay()]}，当天晚上 10 点提醒`, ics: () => dwIcs(l, me), name: `驱虫-${nx}.ics` };
   }
   if (k === 'visit' && l.revisit) {
     const rd = addDays(l.revisit, -1);
-    return { date: rd, text: `${dot(l.revisit)} 复诊，前一天晚上 10 点提醒`, ics: () => revisitIcs(l, me), name: `复诊-${l.revisit}.ics` };
+    return { date: rd, remind: `${dot(rd)} 晚上 10 点提醒`, text: `${dot(l.revisit)} 复诊，前一天晚上 10 点提醒`, ics: () => revisitIcs(l, me), name: `复诊-${l.revisit}.ics` };
   }
   return null;
 }
@@ -2459,13 +2460,13 @@ function calCardHtml() {
   const past = daysUntil(c.date) < 0;
   return `<div class="field-l">日历提醒</div>
     <button class="btn wide" data-act="log-cal"${past ? ' disabled' : ''}>${svg(P.cal, 18, 2)}${past ? '提醒日期已经过了' : '加到日历'}</button>
-    <p class="hint">${c.text}</p>`;
+    <p class="hint">${c.remind}</p>`;
 }
 function saveLog() {
   const k = lf.kind || 'symptom';
   if (k === 'symptom' && !lf.symptomId) { toast('先选一个症状'); return; }
   if (k === 'vaccine' && !lf.vacName) { toast('先填疫苗名字'); return; }
-  if (k === 'deworm' && !lf.dwProduct) { toast('先选用的什么'); return; }
+  if (k === 'deworm' && !lf.dwProduct) { toast('先选驱虫产品'); return; }
   const l = buildLog();
   if (tooBig(l)) return;
   const old = lf.id ? state.logs.get(lf.id) : null;
@@ -2602,10 +2603,10 @@ function manageSection(secId) {
 }
 /* ---------- 就诊地点 / 疫苗 / 驱虫产品 的选项管理 ---------- */
 const ML = {
-  place: { list: PLACE_LIST, title: '去了哪里', field: 'place', kind: 'visit' },
-  vac: { list: VAC_LIST, title: '打的什么疫苗', field: 'vacName', kind: 'vaccine' },
-  'dw-internal': { list: DW_LIST.internal, title: '体内驱虫用的什么', field: 'dwProduct', kind: 'deworm', dw: 'internal' },
-  'dw-external': { list: DW_LIST.external, title: '体外驱虫用的什么', field: 'dwProduct', kind: 'deworm', dw: 'external' }
+  place: { list: PLACE_LIST, title: '医院名称', field: 'place', kind: 'visit' },
+  vac: { list: VAC_LIST, title: '疫苗', field: 'vacName', kind: 'vaccine' },
+  'dw-internal': { list: DW_LIST.internal, title: '体内驱虫', field: 'dwProduct', kind: 'deworm', dw: 'internal' },
+  'dw-external': { list: DW_LIST.external, title: '体外驱虫', field: 'dwProduct', kind: 'deworm', dw: 'external' }
 };
 const KIND_SECS = { visit: ['place'], vaccine: ['vac'], deworm: ['dw-internal', 'dw-external'] };
 const mlItems = key => ML[key].dw ? dwItems(ML[key].dw) : listItems(ML[key].list);
@@ -3117,10 +3118,10 @@ const actions = {
   'vac-pick': el => { lf.vacName = lf.vacName === el.dataset.v ? '' : el.dataset.v; render(); },
   'vac-pick-add': () => askText('疫苗名字', '比如 狂犬、猫三联', v => { addListItem(VAC_LIST, v); lf.vacName = v; render(); }),
   'place-pick': el => { lf.place = lf.place === el.dataset.v ? '' : el.dataset.v; render(); },
-  'place-pick-add': () => askText('去了哪里', '比如 萌宠侍卫', v => { addListItem(PLACE_LIST, v); lf.place = v; render(); }),
+  'place-pick-add': () => askText('医院名称', '比如 萌宠侍卫', v => { addListItem(PLACE_LIST, v); lf.place = v; render(); }),
   'dw-type': el => { lf.dwType = el.dataset.v; if (!dwItems(lf.dwType).includes(lf.dwProduct)) lf.dwProduct = ''; render(); },
   'dw-pick': el => { lf.dwProduct = lf.dwProduct === el.dataset.v ? '' : el.dataset.v; render(); },
-  'dw-pick-add': () => askText(`${DW_TYPES[lf.dwType]}驱虫用的什么`, '比如 大宠爱', v => { dwAddItem(lf.dwType, v); lf.dwProduct = v; render(); }),
+  'dw-pick-add': () => askText(`${DW_TYPES[lf.dwType]}驱虫`, '比如 大宠爱', v => { dwAddItem(lf.dwType, v); lf.dwProduct = v; render(); }),
   'rpt-unit': el => {
     const u = el.dataset.v;
     if (!u) { lf.rpt = null; render(); return; }
