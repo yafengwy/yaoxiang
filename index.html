@@ -168,7 +168,13 @@ button.tag{height:34px;padding:0 12px;font-size:14px;border-radius:10px;display:
 .tagbox{display:flex;flex-wrap:wrap;gap:6px;align-items:center;background:var(--card);border-radius:14px;padding:8px 10px;min-height:52px}
 .tagbox input{flex:1;min-width:140px;border:0;background:none;font-size:16px;height:36px}
 .quick{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
-.seg2,.seg3{display:grid;gap:8px}
+.seg2,.seg3,.seg4{display:grid;gap:8px}
+.seg4{grid-template-columns:repeat(4,minmax(0,1fr))}
+.seg4 button{height:48px;border-radius:14px;border:1px solid var(--line);background:var(--card);font-size:15px;font-weight:600;padding:0 2px}
+.seg4 .on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.wd-pick{display:flex;gap:4px}
+.wd-pick button{width:34px;height:34px;border-radius:17px;border:1px solid var(--line);background:var(--card);font-size:14px;padding:0}
+.wd-pick .on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
 .seg2{grid-template-columns:repeat(2,minmax(0,1fr))}
 .seg3{grid-template-columns:repeat(3,minmax(0,1fr))}
 .seg2 button,.seg3 button{height:48px;border-radius:14px;border:1px solid var(--line);background:var(--card);font-size:15px;font-weight:600;padding:0 4px}
@@ -369,7 +375,7 @@ const BOXES = { cat: '猫用药', human: '人用药' };
 const REMIND_OPTIONS = [30, 60, 120];
 const LOG_TEXT = { add: '添加', in: '入库', use: '用完', open: '开封' };
 const FB_VER = '10.12.2';
-const APP_VER = '2026.09.27-66';
+const APP_VER = '2026.10.02-67';
 const MAX_PHOTOS = 6;
 const PHOTO_PX = 640;
 const PHOTO_Q = 0.62;
@@ -431,6 +437,7 @@ const P = {
   file: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/>',
   down: '<path d="M6 9l6 6 6-6"/>',
   vaccine: '<path d="M18 2l4 4"/><path d="M15.5 4.5l4 4"/><path d="M13 7l4 4-8 8H5v-4z"/><path d="M11 9l2 2"/>',
+  deworm: '<path d="M12 3l8 3v6c0 4.5-3.4 8-8 9-4.6-1-8-4.5-8-9V6z"/><path d="M9 12l2 2 4-4"/>',
   visit: '<path d="M4 21V9.5L12 4l8 5.5V21z"/><path d="M12 11v6M9 14h6"/>',
   up: '<path d="M6 15l6-6 6 6"/>'
 };
@@ -1544,7 +1551,15 @@ async function importData(file) {
 const KINDS = { cat: '猫', human: '人' };
 const SYM_COLORS = ['#E0761A', '#8B5CF6', '#2F8FD6', '#4CAF3F', '#EC4899', '#12B5A5', '#D92D20'];
 const SEC_TYPES = { multi: '多选', single: '单选', number: '数字', text: '文字' };
-const LOG_KINDS = { symptom: '症状', visit: '就诊', vaccine: '疫苗' };
+const LOG_KINDS = { symptom: '症状', visit: '就诊', vaccine: '疫苗', deworm: '驱虫' };
+const EVENT_KINDS = ['visit', 'vaccine', 'deworm'];
+const isEventKey = k => EVENT_KINDS.includes(k);
+const EVENT_RANK = { visit: 1, vaccine: 2, deworm: 3 };
+const DW_COLOR = '#0E8C80';
+const DW_TYPES = { internal: '体内', external: '体外' };
+const DW_LIST = { internal: '体内驱虫', external: '体外驱虫' };
+const DW_DEFAULTS = { internal: ['拜耳', '海乐妙'], external: ['大宠爱', '大宠爱 Plus'] };
+const RPT_UNITS = { day: '天', week: '周', month: '月' };
 const VAC_COLOR = '#2F8FD6';
 const VISIT_COLOR = '#B3261E';
 const VAC_LIST = '疫苗';
@@ -1679,6 +1694,46 @@ function episodeCount(memberId, symptomId, from, to) {
   });
   return n;
 }
+function dwItems(type) {
+  const l = listByName(DW_LIST[type]);
+  return l ? l.items.slice() : DW_DEFAULTS[type].slice();
+}
+function dwAddItem(type, v) {
+  const name = DW_LIST[type];
+  const found = listByName(name);
+  const l = found ? clone(found) : { id: uid(), name, items: DW_DEFAULTS[type].slice() };
+  if (!l.items.includes(v)) l.items.push(v);
+  saveDoc('lists', l);
+}
+function nextDue(date, rpt) {
+  if (!date || !rpt || !rpt.unit || !rpt.every) return '';
+  const n = Math.max(1, Number(rpt.every));
+  const d = parseYmd(date);
+  if (rpt.unit === 'day') { d.setDate(d.getDate() + n); return ymd(d); }
+  if (rpt.unit === 'week') {
+    const wd = rpt.weekday == null ? d.getDay() : Number(rpt.weekday);
+    d.setDate(d.getDate() - d.getDay() + n * 7 + wd);
+    return ymd(d);
+  }
+  const md = rpt.monthDay ? Number(rpt.monthDay) : d.getDate();
+  const t = new Date(d.getFullYear(), d.getMonth() + n, 1);
+  const last = new Date(t.getFullYear(), t.getMonth() + 1, 0).getDate();
+  t.setDate(Math.min(md, last));
+  return ymd(t);
+}
+function rptText(rpt) {
+  if (!rpt || !rpt.unit) return '';
+  const n = Number(rpt.every) || 1;
+  if (rpt.unit === 'day') return n === 1 ? '每天' : `每 ${n} 天`;
+  if (rpt.unit === 'week') return `${n === 1 ? '每周' : `每 ${n} 周`}的星期${WEEK[rpt.weekday == null ? 0 : rpt.weekday]}`;
+  return `${n === 1 ? '每个月' : `每 ${n} 个月`}的 ${rpt.monthDay || 1} 号`;
+}
+function dwLatestId(memberId, type) {
+  const arr = [...state.logs.values()]
+    .filter(x => x.memberId === memberId && kindOf(x) === 'deworm' && x.dwType === type)
+    .sort((a, b) => b.date.localeCompare(a.date));
+  return arr.length ? arr[0].id : '';
+}
 function vacDue(l) {
   if (!l.date || !l.years) return '';
   const d = parseYmd(l.date);
@@ -1700,12 +1755,13 @@ function episodeKeyOf(l) {
 function logTitle(l) {
   const k = kindOf(l);
   if (k === 'vaccine') return `疫苗${l.vacName ? '：' + esc(l.vacName) : ''}`;
+  if (k === 'deworm') return `${DW_TYPES[l.dwType] || ''}驱虫${l.dwProduct ? '：' + esc(l.dwProduct) : ''}`;
   if (k === 'visit') return `就诊${l.place ? '：' + esc(l.place) : ''}`;
   return esc(symName(l.symptomId));
 }
 function logColor(l) {
   const k = kindOf(l);
-  return k === 'vaccine' ? VAC_COLOR : k === 'visit' ? VISIT_COLOR : symColor(l.symptomId);
+  return k === 'vaccine' ? VAC_COLOR : k === 'visit' ? VISIT_COLOR : k === 'deworm' ? DW_COLOR : symColor(l.symptomId);
 }
 function summaryParts(l) {
   if (kindOf(l) === 'vaccine') {
@@ -1713,6 +1769,16 @@ function summaryParts(l) {
     return due ? [{ label: '有效期', value: `${l.years} 年，${dot(due)} 到期` }] : [];
   }
   if (kindOf(l) === 'visit') return [];
+  if (kindOf(l) === 'deworm') {
+    if (!l.rpt || !l.rpt.unit) return [];
+    const nx = nextDue(l.date, l.rpt);
+    const out = [{ label: '重复', value: rptText(l.rpt) }];
+    if (nx && dwLatestId(l.memberId, l.dwType) === l.id) {
+      const dd = daysUntil(nx);
+      out.push({ label: '下次', value: `${dot(nx)}${dd >= 0 ? `（还有 ${dd} 天）` : `（已过 ${-dd} 天）`}` });
+    }
+    return out;
+  }
   const s = symOf(l.symptomId);
   if (!s) return [];
   const out = [];
@@ -1880,14 +1946,14 @@ function logKey(l) {
   return k === 'symptom' ? l.symptomId : k;
 }
 function keyColor(key) {
-  return key === 'vaccine' ? VAC_COLOR : key === 'visit' ? VISIT_COLOR : symColor(key);
+  return key === 'vaccine' ? VAC_COLOR : key === 'visit' ? VISIT_COLOR : key === 'deworm' ? DW_COLOR : symColor(key);
 }
 function keyName(key) {
-  return key === 'vaccine' ? '疫苗' : key === 'visit' ? '就诊' : symName(key);
+  return key === 'vaccine' ? '疫苗' : key === 'visit' ? '就诊' : key === 'deworm' ? '驱虫' : symName(key);
 }
 function markHtml(key, size) {
-  if (key === 'vaccine' || key === 'visit') {
-    return `<span class="kicon" style="color:${keyColor(key)}">${svg(key === 'vaccine' ? P.vaccine : P.visit, size || 13, 2)}</span>`;
+  if (isEventKey(key)) {
+    return `<span class="kicon" style="color:${keyColor(key)}">${svg(P[key], size || 13, 2)}</span>`;
   }
   return `<i style="background:${keyColor(key)}"></i>`;
 }
@@ -1964,7 +2030,7 @@ function logRow(l, inEp, withMember) {
   const color = logColor(l);
   const mark = inEp ? '' : (k === 'symptom'
     ? `<i class="dot" style="background:${color}"></i>`
-    : `<span class="kicon" style="color:${color}">${svg(k === 'vaccine' ? P.vaccine : P.visit, 18, 1.8)}</span>`);
+    : `<span class="kicon" style="color:${color}">${svg(P[k], 18, 1.8)}</span>`);
   return `<div class="log-row${inEp ? ' in-ep' : ''}">
     <a class="log-main" href="#/log/${l.id}">
       ${mark}
@@ -2037,22 +2103,22 @@ function viewMember(id) {
   const range = calRange(anchor, state.calView);
   const symIds = [...new Set(logs.map(logKey))]
     .sort((a, b) => {
-      const rank = k => (k === 'vaccine' ? 2 : k === 'visit' ? 1 : 0);
+      const rank = k => EVENT_RANK[k] || 0;
       return rank(a) - rank(b);
     });
   const rb = rangeBounds();
   const counts = {};
   symIds.forEach(k => {
-    counts[k] = (k === 'vaccine' || k === 'visit')
+    counts[k] = isEventKey(k)
       ? logs.filter(l => logKey(l) === k && l.date >= rb.from && l.date <= rb.to).length
       : episodeCount(id, k, rb.from, rb.to);
   });
-  const totalTimes = symIds.filter(k => k !== 'vaccine' && k !== 'visit').reduce((n, sid) => n + counts[sid], 0);
+  const totalTimes = symIds.filter(k => !isEventKey(k)).reduce((n, sid) => n + counts[sid], 0);
   const shownIds = symIds.filter(k => counts[k] > 0 || filter === k);
   const chips = `<nav class="pills">
       <button class="pill${filter ? '' : ' on'}" data-act="sym-filter" data-v="">全部 ${totalTimes} 次 · ${rb.label}${svg(P.down, 14)}</button>
       ${shownIds.map(k => `<button class="pill${filter === k ? ' on' : ''}" data-act="sym-filter" data-v="${k}">
-        ${k === 'vaccine' || k === 'visit' ? markHtml(k, 15) : `<i class="dot" style="background:${symColor(k)}"></i>`}${esc(keyName(k))} ${counts[k]} 次</button>`).join('')}
+        ${isEventKey(k) ? markHtml(k, 15) : `<i class="dot" style="background:${symColor(k)}"></i>`}${esc(keyName(k))} ${counts[k]} 次</button>`).join('')}
     </nav>`;
   let shown = logs.filter(l => (!filter || logKey(l) === filter));
   let listTitle;
@@ -2193,14 +2259,16 @@ function viewLog(mode, arg) {
       const first = [...state.symptoms.values()][0];
       lf = { key, kind: 'symptom', memberId: arg, symptomId: first ? first.id : '',
         date: state.calDay || todayStr(), values: {}, photos: [], files: [], note: '', healed: false,
-        vacName: '', years: 1, remindDays: 60, place: '' };
+        vacName: '', years: 1, remindDays: 60, place: '',
+        dwType: 'external', dwProduct: '', rpt: null };
     } else {
       const l = state.logs.get(arg);
       if (!l) return notFound();
       lf = { key, id: l.id, kind: kindOf(l), memberId: l.memberId, symptomId: l.symptomId, date: l.date,
         values: clone(l.values || {}), photos: (l.photos || []).slice(), files: clone(l.files || []), note: l.note || '',
         healed: !!l.healed, vacName: l.vacName || '', years: l.years || 1,
-        remindDays: l.remindDays || 60, place: l.place || '', createdAt: l.createdAt };
+        remindDays: l.remindDays || 60, place: l.place || '', createdAt: l.createdAt,
+        dwType: l.dwType || 'external', dwProduct: l.dwProduct || '', rpt: l.rpt ? clone(l.rpt) : null };
     }
   }
   const me = state.members.get(lf.memberId);
@@ -2209,7 +2277,7 @@ function viewLog(mode, arg) {
   const syms = [...state.symptoms.values()];
   const ep = lf.id ? episodeOf(lf.memberId, lf.symptomId, lf.date) : null;
 
-  const kindSeg = `<div class="seg3" style="margin-bottom:4px">${Object.entries(LOG_KINDS).map(([k, l]) =>
+  const kindSeg = `<div class="seg4" style="margin-bottom:4px">${Object.entries(LOG_KINDS).map(([k, l]) =>
     `<button data-act="lf-kind" data-v="${k}" class="${lf.kind === k ? 'on' : ''}">${l}</button>`).join('')}</div>`;
 
   const symChips = `<div class="quick">
@@ -2248,6 +2316,37 @@ function viewLog(mode, arg) {
     <div class="field-l">去了哪里</div>
     ${pickList(PLACE_LIST, lf.place, 'place-pick')}`;
 
+  const rp = lf.rpt;
+  const nx = lf.kind === 'deworm' && rp ? nextDue(lf.date, rp) : '';
+  const dwOpts = [...new Set([...dwItems(lf.dwType), ...(lf.dwProduct ? [lf.dwProduct] : [])])];
+  const dwBody = `
+    <div class="field-l">体内还是体外</div>
+    <div class="seg2">${Object.entries(DW_TYPES).map(([k, l]) =>
+      `<button data-act="dw-type" data-v="${k}" class="${lf.dwType === k ? 'on' : ''}">${l}</button>`).join('')}</div>
+    <div class="field-l">用的什么</div>
+    <div class="quick">
+      ${dwOpts.map(o => `<button class="opt-chip${o === lf.dwProduct ? ' on' : ''}" data-act="dw-pick" data-v="${esc(o)}">${o === lf.dwProduct ? svg(P.check, 15, 2.6) : ''}${esc(o)}</button>`).join('')}
+      <button class="opt-chip add" data-act="dw-pick-add">+ 加一项</button>
+    </div>
+    <div class="field-l">重复</div>
+    <div class="seg4">
+      <button data-act="rpt-unit" data-v="" class="${rp ? '' : 'on'}">不重复</button>
+      ${Object.entries(RPT_UNITS).map(([u, l]) => `<button data-act="rpt-unit" data-v="${u}" class="${rp && rp.unit === u ? 'on' : ''}">按${l}</button>`).join('')}
+    </div>
+    ${rp ? `<div class="card" style="margin-top:12px">
+      <div class="line"><span>每隔</span><div class="stepper">
+        <button data-act="rpt-n" data-v="-1" aria-label="减少"${rp.every <= 1 ? ' disabled' : ''}>${svg(P.minus, 20, 2.2)}</button>
+        <b class="num">${rp.every}</b>
+        <button data-act="rpt-n" data-v="1" aria-label="增加">${svg(P.plus, 20, 2.2)}</button>
+        <span class="muted" style="min-width:34px">${rp.unit === 'month' ? '个月' : RPT_UNITS[rp.unit]}</span></div></div>
+      ${rp.unit === 'week' ? `<div class="line"><span>星期几</span>
+        <div class="wd-pick">${WEEK.map((w, i) => `<button data-act="rpt-wd" data-v="${i}" class="${Number(rp.weekday) === i ? 'on' : ''}">${w}</button>`).join('')}</div></div>` : ''}
+      ${rp.unit === 'month' ? `<label class="line"><span>每月几号</span>
+        <select data-rpt="monthDay">${Array.from({ length: 31 }, (_, i) => i + 1).map(d =>
+          `<option value="${d}"${Number(rp.monthDay) === d ? ' selected' : ''}>${d} 号</option>`).join('')}</select></label>` : ''}
+    </div>
+    ${nx ? `<p class="hint">${rptText(rp)}，下次是 ${dot(nx)} 星期${WEEK[parseYmd(nx).getDay()]}</p>` : ''}` : ''}`;
+
   const sections = sym ? sectionsHtml(sym, lf.values) : '';
 
 
@@ -2278,7 +2377,7 @@ function viewLog(mode, arg) {
         ${symChips}
         ${sections}
         ${sym ? `<button class="btn wide addbtn" data-act="sec-add">${svg(P.plus, 20, 2.2)}加一个板块</button>` : '<p class="hint">先选一个症状，下面才会出现要填的内容</p>'}`
-        : lf.kind === 'vaccine' ? vacBody : visitBody}
+        : lf.kind === 'vaccine' ? vacBody : lf.kind === 'deworm' ? dwBody : visitBody}
       <div class="field-l">备注</div>
       <textarea id="lf-note" class="note-input" data-lf="note" rows="3" placeholder="随便写点什么">${esc(lf.note)}</textarea>
       <div class="field-l">照片和文件</div>
@@ -2292,6 +2391,7 @@ function saveLog() {
   const k = lf.kind || 'symptom';
   if (k === 'symptom' && !lf.symptomId) { toast('先选一个症状'); return; }
   if (k === 'vaccine' && !lf.vacName) { toast('先填疫苗名字'); return; }
+  if (k === 'deworm' && !lf.dwProduct) { toast('先选用的什么'); return; }
   const l = {
     id: lf.id || uid(), kind: k, memberId: lf.memberId,
     date: lf.date || todayStr(), photos: lf.photos, files: lf.files, note: lf.note.trim(),
@@ -2301,6 +2401,12 @@ function saveLog() {
     l.symptomId = lf.symptomId;
     l.values = lf.values;
     l.healed = !!lf.healed;
+  } else if (k === 'deworm') {
+    l.dwType = lf.dwType;
+    l.dwProduct = lf.dwProduct;
+    l.rpt = lf.rpt ? { unit: lf.rpt.unit, every: Number(lf.rpt.every) || 1,
+      weekday: lf.rpt.unit === 'week' ? Number(lf.rpt.weekday) : null,
+      monthDay: lf.rpt.unit === 'month' ? Number(lf.rpt.monthDay) : null } : null;
   } else if (k === 'vaccine') {
     l.vacName = lf.vacName;
     l.years = Number(lf.years) || 1;
@@ -2320,6 +2426,39 @@ function saveLog() {
     const rd = addDays(due, -l.remindDays);
     if (daysUntil(rd) >= 0) afterNav(() => askVaccineCal(l, me));
   }
+  if (k === 'deworm' && l.rpt) {
+    const nx = nextDue(l.date, l.rpt);
+    if (nx && daysUntil(nx) >= 0) afterNav(() => askDwCal(l, me));
+  }
+}
+function askDwCal(l, me) {
+  const nx = nextDue(l.date, l.rpt);
+  showLayer(`<div class="scrim" data-act="close"></div>
+    <div class="sheet" role="dialog" aria-label="驱虫提醒">
+      <h2 class="sheet-t">把下次加到日历？</h2>
+      <p>${esc(me ? me.name : '')} 下次${DW_TYPES[l.dwType]}驱虫是 ${dot(nx)} 星期${WEEK[parseYmd(nx).getDay()]}，当天上午 9 点提醒。</p>
+      <div class="actions2">
+        <button class="btn" data-act="close">以后再说</button>
+        <button class="btn primary" data-act="dw-cal" data-id="${l.id}">加到日历</button>
+      </div></div>`);
+}
+function dwIcs(l, me) {
+  const nx = nextDue(l.date, l.rpt);
+  const d1 = nx.replace(/-/g, '');
+  const d2 = addDays(nx, 1).replace(/-/g, '');
+  const now = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+  const e = x => String(x).replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\n/g, '\\n');
+  const who = me ? me.name : '';
+  const title = `${who} ${DW_TYPES[l.dwType]}驱虫：${l.dwProduct}`;
+  const desc = `上次 ${dot(l.date)}，${rptText(l.rpt)}。`;
+  return [
+    'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//yaoxiang//CN', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH',
+    'BEGIN:VEVENT', `UID:${l.id}-dw-${nx}@yaoxiang`, `DTSTAMP:${now}`,
+    `DTSTART;VALUE=DATE:${d1}`, `DTEND;VALUE=DATE:${d2}`,
+    `SUMMARY:${e(title)}`, `DESCRIPTION:${e(desc)}`,
+    'BEGIN:VALARM', 'ACTION:DISPLAY', `DESCRIPTION:${e(title)}`, 'TRIGGER:PT9H', 'END:VALARM',
+    'END:VEVENT', 'END:VCALENDAR', ''
+  ].join('\r\n');
 }
 function askVaccineCal(l, me) {
   const due = vacDue(l);
@@ -2915,6 +3054,34 @@ const actions = {
   'vac-pick-add': () => askText('疫苗名字', '比如 狂犬、猫三联', v => { addListItem(VAC_LIST, v); lf.vacName = v; render(); }),
   'place-pick': el => { lf.place = lf.place === el.dataset.v ? '' : el.dataset.v; render(); },
   'place-pick-add': () => askText('去了哪里', '比如 萌宠侍卫', v => { addListItem(PLACE_LIST, v); lf.place = v; render(); }),
+  'dw-type': el => { lf.dwType = el.dataset.v; if (!dwItems(lf.dwType).includes(lf.dwProduct)) lf.dwProduct = ''; render(); },
+  'dw-pick': el => { lf.dwProduct = lf.dwProduct === el.dataset.v ? '' : el.dataset.v; render(); },
+  'dw-pick-add': () => askText(`${DW_TYPES[lf.dwType]}驱虫用的什么`, '比如 大宠爱', v => { dwAddItem(lf.dwType, v); lf.dwProduct = v; render(); }),
+  'rpt-unit': el => {
+    const u = el.dataset.v;
+    if (!u) { lf.rpt = null; render(); return; }
+    const d = parseYmd(lf.date || todayStr());
+    const cur = lf.rpt || {};
+    lf.rpt = { unit: u, every: cur.every || (u === 'day' ? 30 : u === 'week' ? 4 : 1),
+      weekday: cur.weekday != null ? cur.weekday : d.getDay(),
+      monthDay: cur.monthDay || d.getDate() };
+    render();
+  },
+  'rpt-n': el => { lf.rpt.every = Math.max(1, Number(lf.rpt.every) + Number(el.dataset.v)); render(); },
+  'rpt-wd': el => { lf.rpt.weekday = Number(el.dataset.v); render(); },
+  'dw-cal': el => {
+    const l = state.logs.get(el.dataset.id);
+    if (!l) { closeLayer(); return; }
+    const me = state.members.get(l.memberId);
+    const name = `驱虫-${nextDue(l.date, l.rpt)}.ics`;
+    const blob = new Blob([dwIcs(l, me)], { type: 'text/calendar' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+    closeLayer();
+  },
   'vac-cal': el => {
     const l = state.logs.get(el.dataset.id);
     if (!l) { closeLayer(); return; }
@@ -2970,7 +3137,7 @@ document.addEventListener('input', e => {
   if (t.dataset.lf && lf) {
     lf[t.dataset.lf] = t.value;
     if (t.tagName === 'TEXTAREA') grow(t);
-    else if (t.dataset.lf === 'date' && lf.kind === 'vaccine') render();
+    else if (t.dataset.lf === 'date' && (lf.kind === 'vaccine' || lf.kind === 'deworm')) render();
     return;
   }
   if (t.dataset.sec && lf) { lf.values[t.dataset.sec] = t.value; return; }
@@ -3044,6 +3211,9 @@ document.addEventListener('change', async e => {
   } else if (t.id === 'import-in' && t.files && t.files[0]) {
     await importData(t.files[0]);
     t.value = '';
+  } else if (t.dataset.rpt && lf && lf.rpt) {
+    lf.rpt[t.dataset.rpt] = Number(t.value);
+    render();
   } else if (t.dataset.change === 'remind') {
     const m = clone(state.meds.get(t.dataset.id));
     m.remindDays = Number(t.value);
