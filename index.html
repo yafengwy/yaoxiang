@@ -49,6 +49,7 @@ button:disabled{opacity:.4;cursor:default}
 .icon-btn.small{width:32px;height:32px;flex-shrink:0;color:var(--muted)}
 .accent-t{color:var(--accent)}
 .sym-dot{width:18px;height:18px;border-radius:9px;flex-shrink:0}
+.kind-ic{width:18px;overflow:visible}
 .colors{display:flex;gap:7px;flex-wrap:wrap;justify-content:flex-end}
 .swatch{width:28px;height:28px;border-radius:14px;border:2px solid transparent;padding:0}
 .swatch.on{border-color:var(--ink)}
@@ -377,7 +378,7 @@ const BOXES = { cat: '猫用药', human: '人用药' };
 const REMIND_OPTIONS = [30, 60, 120];
 const LOG_TEXT = { add: '添加', in: '入库', use: '用完', open: '开封' };
 const FB_VER = '10.12.2';
-const APP_VER = '2026.10.02-68';
+const APP_VER = '2026.10.02-69';
 const MAX_PHOTOS = 6;
 const PHOTO_PX = 640;
 const PHOTO_Q = 0.62;
@@ -2220,11 +2221,14 @@ function viewSymptoms() {
       ${syms.length ? `<div class="mems">${rows}</div>` : '<p class="hint" style="text-align:center">还没有症状</p>'}
       <button class="btn wide addbtn" data-act="new-sym-page">${svg(P.plus, 20, 2.2)}新症状</button>
       <p class="hint">症状是所有成员共用的。在这里改了板块和选项，之后每条记录都按这个样子来。</p>
-      <h2 class="sec" style="margin-top:28px">就诊 · 疫苗 · 驱虫的选项</h2>
-      <div class="mems">${Object.entries(ML).map(([k, o]) => `<button class="mem" data-act="ml-open" data-v="${k}" style="width:100%;text-align:left;border:0;font:inherit">
-        <span class="kicon" style="color:${keyColor(o.kind)}">${svg(P[o.kind], 20, 2)}</span>
-        <div class="mem-b"><b>${o.title}</b><small>${mlItems(k).length} 项</small></div>
-        ${svg(P.chev, 20)}</button>`).join('')}</div>
+      <h2 class="sec" style="margin-top:28px">就诊 · 疫苗 · 驱虫</h2>
+      <div class="mems">${EVENT_KINDS.map(k => {
+        const n = [...state.logs.values()].filter(l => kindOf(l) === k).length;
+        return `<a class="mem" href="#/kind/${k}">
+          <span class="kicon kind-ic" style="color:${keyColor(k)}">${svg(P[k], 22, 2)}</span>
+          <div class="mem-b"><b>${LOG_KINDS[k]}</b><small>${KIND_SECS[k].length} 个板块 · ${n} 条记录</small></div>
+          ${svg(P.chev, 20)}</a>`;
+      }).join('')}</div>
     </main>`;
 }
 function viewSymptom(id) {
@@ -2598,11 +2602,12 @@ function manageSection(secId) {
 }
 /* ---------- 就诊地点 / 疫苗 / 驱虫产品 的选项管理 ---------- */
 const ML = {
-  place: { list: PLACE_LIST, title: '就诊地点', field: 'place', kind: 'visit' },
-  vac: { list: VAC_LIST, title: '疫苗', field: 'vacName', kind: 'vaccine' },
-  'dw-internal': { list: DW_LIST.internal, title: '体内驱虫用的', field: 'dwProduct', kind: 'deworm', dw: 'internal' },
-  'dw-external': { list: DW_LIST.external, title: '体外驱虫用的', field: 'dwProduct', kind: 'deworm', dw: 'external' }
+  place: { list: PLACE_LIST, title: '去了哪里', field: 'place', kind: 'visit' },
+  vac: { list: VAC_LIST, title: '打的什么疫苗', field: 'vacName', kind: 'vaccine' },
+  'dw-internal': { list: DW_LIST.internal, title: '体内驱虫用的什么', field: 'dwProduct', kind: 'deworm', dw: 'internal' },
+  'dw-external': { list: DW_LIST.external, title: '体外驱虫用的什么', field: 'dwProduct', kind: 'deworm', dw: 'external' }
 };
+const KIND_SECS = { visit: ['place'], vaccine: ['vac'], deworm: ['dw-internal', 'dw-external'] };
 const mlItems = key => ML[key].dw ? dwItems(ML[key].dw) : listItems(ML[key].list);
 function mlSave(key, items) {
   const found = listByName(ML[key].list);
@@ -2617,28 +2622,27 @@ function openListManage(key) {
   mlCur = key;
   const items = mlItems(key);
   showLayer(`<div class="scrim" data-act="close"></div>
-    <div class="sheet menu-sheet" role="dialog" aria-label="管理${ML[key].title}">
+    <div class="sheet menu-sheet" role="dialog" aria-label="管理">
       <h2 class="sheet-t">${ML[key].title}</h2>
-      ${items.length ? items.map((o, i) => `<button data-act="ml-item" data-i="${i}"><span>${esc(o)}</span><span class="muted">${mlUses(key, o).length} 条记录 · 改</span></button>`).join('')
+      ${items.length ? items.map((o, i) => `<button data-act="ml-del" data-i="${i}"><span>${esc(o)}</span><span class="danger">删除</span></button>`).join('')
         : '<p>还没有选项</p>'}
-      <button data-act="ml-add"><span class="accent-t">+ 加一项</span></button>
+      <button data-act="ml-add"><span class="accent-t">+ 自己写一项</span></button>
       <button data-act="close">完成</button>
     </div>`);
 }
-function openListItem(i) {
-  const key = mlCur;
-  const v = mlItems(key)[i];
-  if (v == null) return;
-  const n = mlUses(key, v).length;
-  showLayer(`<div class="scrim" data-act="close"></div>
-    <div class="sheet menu-sheet" role="dialog" aria-label="${esc(v)}">
-      <h2 class="sheet-t">${esc(v)}</h2>
-      ${n ? `<p>有 ${n} 条记录用了它。改名会一起改；删除只是从选项里拿掉，那些记录不变。</p>` : ''}
-      <button data-act="ml-ren" data-i="${i}"><span>改名</span></button>
-      ${i > 0 ? `<button data-act="ml-up" data-i="${i}"><span>往前挪</span></button>` : ''}
-      <button data-act="ml-del" data-i="${i}"><span class="danger">从选项里删除</span></button>
-      <button data-act="ml-back">返回</button>
-    </div>`);
+function viewKind(k) {
+  if (!KIND_SECS[k]) return notFound();
+  const n = [...state.logs.values()].filter(l => kindOf(l) === k).length;
+  const secs = KIND_SECS[k].map(key => `<div class="sec-block">
+      <div class="sec-head"><span>${ML[key].title}</span><button class="link-btn" data-act="ml-open" data-v="${key}">管理</button></div>
+      <div class="quick">
+        ${mlItems(key).map((o, i) => `<button class="opt-chip" data-act="ml-ren" data-key="${key}" data-i="${i}">${esc(o)}</button>`).join('')}
+        <button class="opt-chip add" data-act="ml-add" data-key="${key}">+ 加一项</button></div></div>`).join('');
+  return topbar(backBtn('#/symptoms'), LOG_KINDS[k], '') +
+    `<main class="pad form">
+      <p class="hint">一共 ${n} 条${LOG_KINDS[k]}记录。点名字可以改名，改了之后用过这个名字的记录会一起改；删除只是从选项里拿掉，以前的记录不变。</p>
+      ${secs}
+    </main>`;
 }
 function sectionAdd(name, type) {
   const sym = clone(symOf(activeSymId()));
@@ -2739,6 +2743,7 @@ function renderView() {
     else if (a === 'symptoms') html = viewSymptoms();
     else if (a === 'symptom') html = viewSymptom(b);
     else if (a === 'symlog') html = viewSymLogs(b);
+    else if (a === 'kind') html = viewKind(b);
     else if (a === 'log' && b === 'new') html = viewLog('new', c);
     else if (a === 'log') html = viewLog('edit', b);
     else if (a === 'settings') html = viewSettings();
@@ -3129,38 +3134,30 @@ const actions = {
   'rpt-n': el => { lf.rpt.every = Math.max(1, Number(lf.rpt.every) + Number(el.dataset.v)); render(); },
   'rpt-wd': el => { lf.rpt.weekday = Number(el.dataset.v); render(); },
   'ml-open': el => openListManage(el.dataset.v),
-  'ml-back': () => openListManage(mlCur),
-  'ml-item': el => openListItem(Number(el.dataset.i)),
-  'ml-add': () => {
-    const key = mlCur;
+  'ml-add': el => {
+    const inSheet = !el.dataset.key;
+    const key = el.dataset.key || mlCur;
     askText('加一项：' + ML[key].title, '写上名字', v => {
       const items = mlItems(key);
       if (!items.includes(v)) items.push(v);
       mlSave(key, items);
-      openListManage(key);
+      if (inSheet) openListManage(key); else render();
     });
   },
   'ml-ren': el => {
-    const key = mlCur, i = Number(el.dataset.i);
+    const key = el.dataset.key, i = Number(el.dataset.i);
     const old = mlItems(key)[i];
     askText('改名：' + old, old, v => {
-      if (v === old) { openListManage(key); return; }
+      if (v === old) return;
       const items = mlItems(key);
       if (items.includes(v)) items.splice(i, 1); else items[i] = v;
       mlSave(key, items);
       mlUses(key, old).forEach(l => { const x = clone(l); x[ML[key].field] = v; saveDoc('logs', x); });
       if (lf && lf[ML[key].field] === old) lf[ML[key].field] = v;
-      openListManage(key);
+      render();
     });
     const inp = document.getElementById('ask-in');
     if (inp) { inp.value = old; ask.value = old; }
-  },
-  'ml-up': el => {
-    const key = mlCur, i = Number(el.dataset.i);
-    const items = mlItems(key);
-    [items[i - 1], items[i]] = [items[i], items[i - 1]];
-    mlSave(key, items);
-    openListManage(key);
   },
   'ml-del': el => {
     const key = mlCur, i = Number(el.dataset.i);
