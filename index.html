@@ -379,7 +379,7 @@ const BOXES = { cat: '猫用药', human: '人用药' };
 const REMIND_OPTIONS = [30, 60, 120];
 const LOG_TEXT = { add: '添加', in: '入库', use: '用完', open: '开封' };
 const FB_VER = '10.12.2';
-const APP_VER = '2026.10.02-71';
+const APP_VER = '2026.10.03-72';
 const MAX_PHOTOS = 6;
 const PHOTO_PX = 640;
 const PHOTO_Q = 0.62;
@@ -691,7 +691,7 @@ function medRow(m) {
     <div class="row-b">
       <div class="row-t"><b>${esc(m.name)}</b>${m.spec ? `<small>${esc(m.spec)}</small>` : ''}</div>
       ${tagsHtml(m, false)}
-      <div class="row-s">共 <b class="qty">${tot}</b> 件${op ? `，<span class="warn-t"><b class="qty">${op}</b> 件已开封</span>` : ''}</div>
+      <div class="row-s">共 <b class="qty">${tot}</b> 件${op ? `，<span class="warn-t"><b class="qty">${op}</b> 件已开封 · ${[...new Set(liveBatches(m).filter(x => x.opened).map(x => x.opened))].sort().map(dot).join('、')}</span>` : ''}</div>
       <div class="row-s">${noExp(m) ? '过期日期还没填' : (e ? dot(e) + ' 到期' : '已用完')}</div>
     </div>
     ${daysHtml(m)}</a>`;
