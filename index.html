@@ -379,7 +379,7 @@ const BOXES = { cat: '猫用药', human: '人用药' };
 const REMIND_OPTIONS = [30, 60, 120];
 const LOG_TEXT = { add: '添加', in: '入库', use: '用完', open: '开封' };
 const FB_VER = '10.12.2';
-const APP_VER = '2026.10.02-70';
+const APP_VER = '2026.10.02-71';
 const MAX_PHOTOS = 6;
 const PHOTO_PX = 640;
 const PHOTO_Q = 0.62;
@@ -1681,18 +1681,25 @@ function episodeOf(memberId, symptomId, date) {
   const day = Math.round((parseYmd(date) - parseYmd(from)) / 86400000) + 1;
   return { day, from };
 }
-function episodeCount(memberId, symptomId, from, to) {
-  let arr = logsFor(memberId, symptomId);
-  if (from) arr = arr.filter(l => l.date >= from && l.date <= to);
-  if (!arr.length) return 0;
-  const sy = symOf(symptomId);
-  if (sy && sy.healTrack === false) return arr.length;
-  let n = 0, open = false;
-  arr.forEach(l => {
-    if (!open) { n++; open = true; }
-    if (l.healed) open = false;
+/* 一次生病：从第一条记录到「已痊愈」那条；还没好的算到今天 */
+function episodeSpans(memberId, symptomId) {
+  const out = [];
+  let cur = null;
+  logsFor(memberId, symptomId).forEach(l => {
+    if (!cur) { cur = { from: l.date, end: l.date, healed: false }; out.push(cur); }
+    cur.end = l.date;
+    if (l.healed) { cur.healed = true; cur = null; }
   });
-  return n;
+  const t = todayStr();
+  if (cur && cur.end < t) cur.end = t;
+  return out;
+}
+function episodeCount(memberId, symptomId, from, to) {
+  const sy = symOf(symptomId);
+  if (sy && sy.healTrack === false) {
+    return logsFor(memberId, symptomId).filter(l => !from || (l.date >= from && l.date <= to)).length;
+  }
+  return episodeSpans(memberId, symptomId).filter(e => !from || (e.from <= to && e.end >= from)).length;
 }
 function dwItems(type) {
   const l = listByName(DW_LIST[type]);
@@ -2071,7 +2078,7 @@ function episodeBlock(key, grp, open, withMember) {
       ${thumbs.length ? `<span class="ep-th">${thumbs.map(p => `<img src="${esc(p)}" alt="">`).join('')}</span>` : ''}
       <span class="ep-caret">${svg(open ? P.up : P.down, 20)}</span>
     </button>
-    ${open ? `<div class="ep-kids">${grp.map(l => logRow(l, true, withMember)).join('')}</div>` : ''}
+    ${open ? `<div class="ep-kids">${(state.sortAsc ? grp : grp.slice().reverse()).map(l => logRow(l, true, withMember)).join('')}</div>` : ''}
   </div>`;
 }
 function logsHtml(list, withMember) {
@@ -2137,7 +2144,21 @@ function viewMember(id) {
   } else if (filter) {
     listTitle = `${keyName(filter)}的全部记录`;
   } else {
-    shown = shown.filter(l => l.date >= rb.from && l.date <= rb.to);
+    const epIn = {};
+    const spanOf = k => {
+      if (!(k in epIn)) {
+        const rows = logs.filter(x => episodeKeyOf(x) === k);
+        const done = rows.some(x => x.healed);
+        const end = done ? rows[rows.length - 1].date : todayStr();
+        epIn[k] = rows[0].date <= rb.to && end >= rb.from;
+      }
+      return epIn[k];
+    };
+    shown = shown.filter(l => {
+      if (l.date >= rb.from && l.date <= rb.to) return true;
+      const k = episodeKeyOf(l);
+      return k ? spanOf(k) : false;
+    });
     listTitle = `${rb.label}的记录`;
   }
   if (!state.sortAsc) shown = shown.slice().reverse();
