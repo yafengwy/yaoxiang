@@ -320,6 +320,8 @@ button.tag{height:34px;padding:0 12px;font-size:14px;border-radius:10px;display:
 .log-b{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
 .log-b b{font-size:16px}
 .log-date{font-size:16px;font-weight:400;color:var(--ink) !important;line-height:1.35}
+.imp{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:9px;background:#D93025;color:#fff !important;font-size:13px;font-weight:700;line-height:1;margin-right:6px;vertical-align:2px}
+.seg .imp{width:15px;height:15px;font-size:11px;margin-right:2px;vertical-align:1px}
 .log-th{width:52px;height:52px;border-radius:12px;object-fit:cover;flex-shrink:0}
 .pill .dot{width:8px;height:8px;border-radius:4px;margin-right:6px}
 .sec-block{margin-top:18px}
@@ -379,7 +381,7 @@ const BOXES = { cat: '猫用药', human: '人用药' };
 const REMIND_OPTIONS = [30, 60, 120];
 const LOG_TEXT = { add: '添加', in: '入库', use: '用完', open: '开封' };
 const FB_VER = '10.12.2';
-const APP_VER = '2026.10.03-73';
+const APP_VER = '2026.10.05-74';
 const MAX_PHOTOS = 6;
 const PHOTO_PX = 640;
 const PHOTO_Q = 0.62;
@@ -2040,6 +2042,8 @@ function logRow(l, inEp, withMember) {
   const parts = summaryParts(l);
   const k = kindOf(l);
   const color = logColor(l);
+  const sy0 = k === 'symptom' ? symOf(l.symptomId) : null;
+  const imp = l.important && sy0 && sy0.flagTrack ? '<span class="imp" title="重点">!</span>' : '';
   const mark = inEp ? '' : (k === 'symptom'
     ? `<i class="dot" style="background:${color}"></i>`
     : `<span class="kicon" style="color:${color}">${svg(P[k], 18, 1.8)}</span>`);
@@ -2048,8 +2052,8 @@ function logRow(l, inEp, withMember) {
       ${mark}
       <div class="log-b">
         ${inEp
-          ? `<span class="log-date">${dot(l.date).slice(5)}${l.healed ? '<span class="healed">已痊愈</span>' : ''}</span>`
-          : `<b>${logTitle(l)}${withMember ? ` <span class="who">${esc((state.members.get(l.memberId) || {}).name || '')}</span>` : ''}${l.healed ? '<span class="healed">已痊愈</span>' : ''}</b>
+          ? `<span class="log-date">${imp}${dot(l.date).slice(5)}${l.healed ? '<span class="healed">已痊愈</span>' : ''}</span>`
+          : `<b>${imp}${logTitle(l)}${withMember ? ` <span class="who">${esc((state.members.get(l.memberId) || {}).name || '')}</span>` : ''}${l.healed ? '<span class="healed">已痊愈</span>' : ''}</b>
              <span class="log-date">${dot(l.date)}</span>`}
         ${parts.map(p => `<span class="row-s"><b>${esc(p.label)}</b> ${esc(p.value)}</span>`).join('')}
         ${l.note ? `<span class="row-note">${esc(l.note)}</span>` : ''}
@@ -2278,6 +2282,15 @@ function viewSymptom(id) {
         </div>
       </div>
       <p class="hint">像角膜溃疡这种会拖好几天的，开着；记了「未痊愈」之后，中间没记录的日子日历上会显示浅色的点。像呕吐这种当天记当天的，可以关掉。</p>
+      <div class="card">
+        <div class="line"><span>标记重点</span>
+          <div class="seg tiny">
+            <button data-act="sym-flag" data-id="${id}" data-v="1" class="${sy.flagTrack ? 'on' : ''}">要</button>
+            <button data-act="sym-flag" data-id="${id}" data-v="0" class="${sy.flagTrack ? '' : 'on'}">不要</button>
+          </div>
+        </div>
+      </div>
+      <p class="hint">开着的话，记这个症状时可以把某一条标成「重点」，列表里那条前面会有红色的 <span class="imp">!</span>，提醒你多看一下。</p>
       <p class="hint">下面就是记录这个症状时会看到的样子</p>
       ${sectionsHtml(sy, null)}
       <button class="btn wide addbtn" data-act="sec-add">${svg(P.plus, 20, 2.2)}加一个板块</button>
@@ -2300,7 +2313,7 @@ function viewLog(mode, arg) {
       if (!l) return notFound();
       lf = { key, id: l.id, kind: kindOf(l), memberId: l.memberId, symptomId: l.symptomId, date: l.date,
         values: clone(l.values || {}), photos: (l.photos || []).slice(), files: clone(l.files || []), note: l.note || '',
-        healed: !!l.healed, vacName: l.vacName || '', years: l.years || 1,
+        healed: !!l.healed, important: !!l.important, vacName: l.vacName || '', years: l.years || 1,
         remindDays: l.remindDays || 60, place: l.place || '', revisit: l.revisit || '', createdAt: l.createdAt,
         dwType: l.dwType || 'external', dwProduct: l.dwProduct || '', rpt: l.rpt ? clone(l.rpt) : null };
     }
@@ -2410,6 +2423,12 @@ function viewLog(mode, arg) {
             <button data-act="lf-healed" data-v="1" class="${lf.healed ? 'on' : ''}">已痊愈</button>
           </div>
         </div>` : ''}
+        ${lf.kind === 'symptom' && sym && sym.flagTrack ? `<div class="line"><span>重点</span>
+          <div class="seg tiny">
+            <button data-act="lf-imp" data-v="0" class="${lf.important ? '' : 'on'}">普通</button>
+            <button data-act="lf-imp" data-v="1" class="${lf.important ? 'on' : ''}"><span class="imp">!</span> 重点</button>
+          </div>
+        </div>` : ''}
       </div>
       ${lf.kind === 'symptom' && ep && ep.day > 1 && sym && sym.healTrack !== false ? `<p class="hint">这次从 ${dot(ep.from)} 开始，这是第 ${ep.day} 天</p>` : ''}
       ${lf.kind === 'symptom' ? `<div class="field-l">症状</div>
@@ -2438,6 +2457,7 @@ function buildLog() {
     l.symptomId = lf.symptomId;
     l.values = lf.values;
     l.healed = !!lf.healed;
+    l.important = !!lf.important;
   } else if (k === 'deworm') {
     l.dwType = lf.dwType;
     l.dwProduct = lf.dwProduct;
@@ -3062,6 +3082,12 @@ const actions = {
     saveDoc('symptoms', sy);
   },
   'sym-member': el => { state.symMember = el.dataset.v; render(); },
+  'sym-flag': el => {
+    const sy = clone(state.symptoms.get(el.dataset.id));
+    sy.flagTrack = el.dataset.v === '1';
+    saveDoc('symptoms', sy);
+  },
+  'lf-imp': el => { lf.important = el.dataset.v === '1'; render(); },
   'sym-heal': el => {
     const sy = clone(state.symptoms.get(el.dataset.id));
     sy.healTrack = el.dataset.v === '1';
