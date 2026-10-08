@@ -243,7 +243,7 @@ button.tag{height:34px;padding:0 12px;font-size:14px;border-radius:10px;display:
 .note-box{white-space:pre-wrap;padding:14px 0;font-size:16px}
 .line textarea{flex:1;min-width:0;border:0;background:none;font:inherit;font-size:16px;padding:14px 0;resize:none;text-align:left;line-height:1.5;overflow:hidden}
 .note-input{width:100%;border:0;border-radius:16px;background:var(--card);padding:14px 16px;font:inherit;font-size:16px;line-height:1.5;resize:none;overflow:auto;color:var(--ink);box-sizing:border-box;max-height:60vh}
-.crop-wrap{width:min(320px,78vw);height:min(320px,78vw);margin:10px auto 14px;border-radius:18px;overflow:hidden;background:#000;position:relative;touch-action:none}
+.crop-wrap{width:min(320px,78vw);height:min(320px,78vw);margin:10px auto 14px;border-radius:18px;overflow:hidden;background:#fff;position:relative;touch-action:none}
 .crop-wrap img{position:absolute;left:50%;top:50%;transform-origin:center;will-change:transform;-webkit-user-drag:none;user-select:none;max-width:none}
 .crop-tools{display:flex;align-items:center;gap:10px}
 .crop-tools input[type=range]{flex:1;accent-color:var(--accent)}
@@ -381,7 +381,7 @@ const BOXES = { cat: '猫用药', human: '人用药' };
 const REMIND_OPTIONS = [30, 60, 120];
 const LOG_TEXT = { add: '添加', in: '入库', use: '用完', open: '开封' };
 const FB_VER = '10.12.2';
-const APP_VER = '2026.10.05-74';
+const APP_VER = '2026.10.08-75';
 const MAX_PHOTOS = 6;
 const PHOTO_PX = 640;
 const PHOTO_Q = 0.62;
@@ -1260,7 +1260,9 @@ function openCropper(src, onDone, onClose) {
   const img = new Image();
   img.onload = () => {
     const V = Math.min(320, Math.round(window.innerWidth * 0.78));
-    cropper = { img, V, base: V / Math.min(img.naturalWidth, img.naturalHeight), s: 1, ox: 0, oy: 0, onDone, onClose };
+    const w = img.naturalWidth, h = img.naturalHeight;
+    /* 默认整张都放进框里（不裁），可以放大到铺满再继续放大 */
+    cropper = { img, V, base: V / Math.max(w, h), s: 1, max: Math.max(w, h) / Math.min(w, h) * 4, ox: 0, oy: 0, onDone, onClose };
     renderCropper();
   };
   img.onerror = () => {
@@ -1277,7 +1279,7 @@ function renderCropper() {
       <div class="crop-wrap" id="crop-wrap"><img id="crop-img" src="${esc(cropper.img.src)}" alt=""></div>
       <div class="crop-tools">
         <button class="icon-btn" data-act="crop-zoom" data-v="-0.25" aria-label="缩小">${svg(P.minus, 20, 2.2)}</button>
-        <input id="crop-range" type="range" min="1" max="4" step="0.01" value="${cropper.s}" aria-label="缩放">
+        <input id="crop-range" type="range" min="1" max="${cropper.max}" step="0.01" value="${cropper.s}" aria-label="缩放">
         <button class="icon-btn" data-act="crop-zoom" data-v="0.25" aria-label="放大">${svg(P.plus, 20, 2.2)}</button>
       </div>
       <div class="actions2">
@@ -1299,7 +1301,7 @@ function cropApply() {
   if (el) el.style.transform = `translate(-50%, -50%) translate(${c.ox}px, ${c.oy}px) scale(${k})`;
 }
 function cropZoom(delta) {
-  cropper.s = Math.min(4, Math.max(1, cropper.s + delta));
+  cropper.s = Math.min(cropper.max, Math.max(1, cropper.s + delta * cropper.max / 4));
   const r = document.getElementById('crop-range');
   if (r) r.value = cropper.s;
   cropApply();
@@ -1327,7 +1329,7 @@ function bindCropper() {
       const [a, b] = [...pts.values()];
       const d = Math.hypot(a.x - b.x, a.y - b.y);
       if (startDist) {
-        cropper.s = Math.min(4, Math.max(1, startScale * d / startDist));
+        cropper.s = Math.min(cropper.max, Math.max(1, startScale * d / startDist));
         range.value = cropper.s;
       }
     } else if (last) {
@@ -1345,15 +1347,14 @@ function bindCropper() {
 function cropDone() {
   const c = cropper;
   const k = c.base * c.s;
-  const half = (c.V / 2) / k;
-  const cx = c.img.naturalWidth / 2 - c.ox / k;
-  const cy = c.img.naturalHeight / 2 - c.oy / k;
+  const r = PHOTO_PX / c.V;
+  const dw = c.img.naturalWidth * k * r, dh = c.img.naturalHeight * k * r;
   const canvas = document.createElement('canvas');
   canvas.width = canvas.height = PHOTO_PX;
   const ctx = canvas.getContext('2d');
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, PHOTO_PX, PHOTO_PX);
-  ctx.drawImage(c.img, cx - half, cy - half, half * 2, half * 2, 0, 0, PHOTO_PX, PHOTO_PX);
+  ctx.drawImage(c.img, PHOTO_PX / 2 + c.ox * r - dw / 2, PHOTO_PX / 2 + c.oy * r - dh / 2, dw, dh);
   const data = canvas.toDataURL('image/jpeg', PHOTO_Q);
   const done = c.onDone;
   if (c.onClose) c.onClose();
