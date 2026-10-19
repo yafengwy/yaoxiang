@@ -382,7 +382,7 @@ const BOXES = { cat: '猫用药', human: '人用药' };
 const REMIND_OPTIONS = [30, 60, 120];
 const LOG_TEXT = { add: '添加', in: '入库', use: '用完', open: '开封' };
 const FB_VER = '10.12.2';
-const APP_VER = '2026.10.18-76';
+const APP_VER = '2026.10.18-77';
 const MAX_PHOTOS = 6;
 const PHOTO_PX = 640;
 const PHOTO_Q = 0.62;
@@ -2820,6 +2820,8 @@ async function makeReport(key, layout) {
         const l = rows[i + j], x = M + j * (col + gap);
         let yy = y;
         const ph = l.photos || [];
+        /* 日期在上，照片在中间，字在下面 */
+        yy += putText(textImg(reportRuns(l, from, true), col), x, yy) + 4;
         if (ph.length) {
           await putPhoto(l, 0, x, yy, col);
           yy += col;
@@ -2828,11 +2830,10 @@ async function makeReport(key, layout) {
             for (let k = 1; k < ph.length; k++) await putPhoto(l, k, x + (k - 1) * (t + 6), yy + 6, t);
             yy += 6 + t;
           }
-          yy += 6;
-          yy += putText(textImg(reportRuns(l, from, true).concat(bodyRuns(l, 9.5)), col), x, yy);
+          const body = bodyRuns(l, 9.5);
+          if (body.length) yy += 4 + putText(textImg(body, col), x, yy + 4);
         } else {
-          yy += putText(textImg(bodyRuns(l, 12), col, { bg: '#F3F5F1', round: true, pad: 14, minH: col }), x, yy) + 6;
-          yy += putText(textImg(reportRuns(l, from, true), col), x, yy);
+          yy += putText(textImg(bodyRuns(l, 12), col, { bg: '#F3F5F1', round: true, pad: 14, minH: col }), x, yy);
         }
         rowH = Math.max(rowH, yy - y);
       }
