@@ -382,7 +382,7 @@ const BOXES = { cat: '猫用药', human: '人用药' };
 const REMIND_OPTIONS = [30, 60, 120];
 const LOG_TEXT = { add: '添加', in: '入库', use: '用完', open: '开封' };
 const FB_VER = '10.12.2';
-const APP_VER = '2026.10.18-77';
+const APP_VER = '2026.10.18-78';
 const MAX_PHOTOS = 6;
 const PHOTO_PX = 640;
 const PHOTO_Q = 0.62;
@@ -2807,7 +2807,7 @@ async function makeReport(key, layout) {
   };
   y += putText(textImg([
     [{ t: `${me.name || ''} · ${symName(first.symptomId)}`, size: 22, bold: true }],
-    Object.assign([{ t: `${dot(from)} – ${dot(to)} · ${days} 天 · ${rows.length} 条记录　`, size: 11, color: '#5A635E' },
+    Object.assign([{ t: `${dot(from)} – ${done ? dot(to) : `今天（${dot(to)}）`} · ${days} 天 · ${rows.length} 条记录　`, size: 11, color: '#5A635E' },
       { t: done ? '已痊愈' : '还没好', size: 11, bold: true, color: done ? '#2E6A4C' : '#8A4F00' }], { gap: 4 })
   ], CW), M, y) + 14;
   items.push({ line: [M, y, W - M, y] });
