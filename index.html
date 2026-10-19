@@ -382,7 +382,7 @@ const BOXES = { cat: '猫用药', human: '人用药' };
 const REMIND_OPTIONS = [30, 60, 120];
 const LOG_TEXT = { add: '添加', in: '入库', use: '用完', open: '开封' };
 const FB_VER = '10.12.2';
-const APP_VER = '2026.10.18-80';
+const APP_VER = '2026.10.18-81';
 const MAX_PHOTOS = 6;
 const PHOTO_PX = 640;
 const PHOTO_Q = 0.62;
@@ -552,7 +552,7 @@ const CloudStore = {
     firebase.initializeApp(FIREBASE_CONFIG);
     this.auth = firebase.auth();
     this.fs = firebase.firestore();
-    try { await this.fs.enablePersistence({ synchronizeTabs: true }); } catch (e) { /* 离线缓存不可用时照常运行 */ }
+    /* 不开离线缓存：iPhone 切到后台再回来时，Safari 会断开这个缓存，Firestore 就报 “client has already been terminated”，之后都存不进去 */
     this.auth.onAuthStateChanged(user => {
       this.unsubs.forEach(u => u());
       this.unsubs = [];
@@ -570,7 +570,7 @@ const CloudStore = {
             else state[c].set(ch.doc.id, ch.doc.data());
           });
           loaded++;
-          if (loaded >= COLS.length) state.ready = true;
+          if (loaded >= COLS.length && !state.ready) { state.ready = true; flushPending(); }
           render();
         }, err => toast('同步出错：' + err.message)));
       });
@@ -591,14 +591,55 @@ const CloudStore = {
   }
 };
 
+/* 连接断了没存进去的改动先放在手机里，重新连上后自动补存 */
+const PENDING_KEY = 'yaoxiang-pending';
+function readPending() {
+  try { return JSON.parse(localStorage.getItem(PENDING_KEY) || '[]'); } catch (e) { return []; }
+}
+function writePending(list) {
+  try {
+    if (list.length) localStorage.setItem(PENDING_KEY, JSON.stringify(list));
+    else localStorage.removeItem(PENDING_KEY);
+    return true;
+  } catch (e) { return false; }
+}
+let reconnecting = false;
+function writeFailed(e, job) {
+  const msg = String((e && e.message) || e);
+  if (!/terminated|INTERNAL ASSERTION|IndexedDB|network|unavailable|offline/i.test(msg)) {
+    toast((job.del ? '删除失败：' : '保存失败：') + msg);
+    return;
+  }
+  const list = readPending().filter(x => !(x.col === job.col && x.id === job.id));
+  list.push(job);
+  if (!writePending(list)) { toast('保存失败：' + msg); return; }
+  if (reconnecting) return;
+  reconnecting = true;
+  toast('连接断了，正在重新连接，刚才的内容会自动补存');
+  setTimeout(() => location.reload(), 1200);
+}
+async function flushPending() {
+  const list = readPending();
+  if (!list.length) return;
+  const left = [];
+  for (const job of list) {
+    try {
+      if (job.del) { await store.del(job.col, job.id); state[job.col].delete(job.id); }
+      else { await store.put(job.col, job.d); state[job.col].set(job.id, job.d); }
+    } catch (e) { left.push(job); }
+  }
+  writePending(left);
+  render();
+  toast(left.length ? `还有 ${left.length} 条没存上，稍后会再试` : `已补存 ${list.length} 条改动`);
+}
 function saveDoc(col, d) {
   state[col].set(d.id, d);
   render();
-  Promise.resolve().then(() => store.put(col, d)).catch(e => toast('保存失败：' + e.message));
+  Promise.resolve().then(() => store.put(col, d)).catch(e => writeFailed(e, { col, id: d.id, d }));
 }
 function delDoc(col, id) {
   state[col].delete(id);
-  Promise.resolve().then(() => store.del(col, id)).catch(e => toast('删除失败：' + e.message));
+  Promise.resolve().then(() => store.del(col, id)).catch(e => writeFailed(e, { col, id, del: true }));
 }
 function save(m) { saveDoc('meds', m); }
 
