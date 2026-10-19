@@ -313,6 +313,7 @@ button.tag{height:34px;padding:0 12px;font-size:14px;border-radius:10px;display:
 .ep-th img:nth-child(3n+1){margin-left:0}
 .ep-caret{color:var(--muted);display:flex;flex-shrink:0}
 .ep-kids{display:flex;flex-direction:column;gap:8px;margin-left:18px}
+.ep-rep{align-self:flex-start;min-height:30px;padding:0 4px}
 .log-row.in-ep{background:var(--card)}
 .kicon{display:inline-flex;align-items:center;justify-content:center;flex-shrink:0}
 .cal-cell .dots .kicon{height:13px}
@@ -381,10 +382,12 @@ const BOXES = { cat: '猫用药', human: '人用药' };
 const REMIND_OPTIONS = [30, 60, 120];
 const LOG_TEXT = { add: '添加', in: '入库', use: '用完', open: '开封' };
 const FB_VER = '10.12.2';
-const APP_VER = '2026.10.08-75';
+const APP_VER = '2026.10.18-76';
 const MAX_PHOTOS = 6;
 const PHOTO_PX = 640;
 const PHOTO_Q = 0.62;
+const HD_PX = 2048;
+const HD_Q = 0.86;
 
 const $app = document.getElementById('app');
 const $layer = document.getElementById('layer');
@@ -1256,13 +1259,13 @@ function renderViewer() {
     </div>`);
 }
 
-function openCropper(src, onDone, onClose) {
+function openCropper(src, onDone, onClose, opts) {
   const img = new Image();
   img.onload = () => {
     const V = Math.min(320, Math.round(window.innerWidth * 0.78));
     const w = img.naturalWidth, h = img.naturalHeight;
     /* 默认整张都放进框里（不裁），可以放大到铺满再继续放大 */
-    cropper = { img, V, base: V / Math.max(w, h), s: 1, max: Math.max(w, h) / Math.min(w, h) * 4, ox: 0, oy: 0, onDone, onClose };
+    cropper = { img, V, base: V / Math.max(w, h), s: 1, max: Math.max(w, h) / Math.min(w, h) * 4, ox: 0, oy: 0, onDone, onClose, hd: !!(opts && opts.hd) };
     renderCropper();
   };
   img.onerror = () => {
@@ -1356,11 +1359,25 @@ function cropDone() {
   ctx.fillRect(0, 0, PHOTO_PX, PHOTO_PX);
   ctx.drawImage(c.img, PHOTO_PX / 2 + c.ox * r - dw / 2, PHOTO_PX / 2 + c.oy * r - dh / 2, dw, dh);
   const data = canvas.toDataURL('image/jpeg', PHOTO_Q);
+  /* 高清版：同样的裁剪，按原图实际像素出图，最长 2048 */
+  let hd = '';
+  const hdPx = Math.min(HD_PX, Math.round(c.V / k));
+  if (c.hd && hdPx > PHOTO_PX) {
+    const r2 = hdPx / c.V;
+    const cv = document.createElement('canvas');
+    cv.width = cv.height = hdPx;
+    const x = cv.getContext('2d');
+    x.fillStyle = '#ffffff';
+    x.fillRect(0, 0, hdPx, hdPx);
+    const w2 = c.img.naturalWidth * k * r2, h2 = c.img.naturalHeight * k * r2;
+    x.drawImage(c.img, hdPx / 2 + c.ox * r2 - w2 / 2, hdPx / 2 + c.oy * r2 - h2 / 2, w2, h2);
+    hd = cv.toDataURL('image/jpeg', HD_Q);
+  }
   const done = c.onDone;
   if (c.onClose) c.onClose();
   cropper = null;
   closeLayer();
-  done(data);
+  done(data, hd);
 }
 const MAX_FILE = 12 * 1024 * 1024;
 const CHUNK = 600000;
@@ -2084,7 +2101,7 @@ function episodeBlock(key, grp, open, withMember) {
       ${thumbs.length ? `<span class="ep-th">${thumbs.map(p => `<img src="${esc(p)}" alt="">`).join('')}</span>` : ''}
       <span class="ep-caret">${svg(open ? P.up : P.down, 20)}</span>
     </button>
-    ${open ? `<div class="ep-kids">${(state.sortAsc ? grp : grp.slice().reverse()).map(l => logRow(l, true, withMember)).join('')}</div>` : ''}
+    ${open ? `<div class="ep-kids"><button class="link-btn ep-rep" data-act="ep-report" data-k="${esc(key)}">${svg(P.file, 16, 1.8)}生成问诊图</button>${(state.sortAsc ? grp : grp.slice().reverse()).map(l => logRow(l, true, withMember)).join('')}</div>` : ''}
   </div>`;
 }
 function logsHtml(list, withMember) {
@@ -2306,7 +2323,7 @@ function viewLog(mode, arg) {
       if (!state.members.get(arg)) return notFound();
       const first = [...state.symptoms.values()][0];
       lf = { key, kind: 'symptom', memberId: arg, symptomId: first ? first.id : '',
-        date: state.calDay || todayStr(), values: {}, photos: [], files: [], note: '', healed: false,
+        date: state.calDay || todayStr(), values: {}, photos: [], files: [], note: '', healed: false, hd: {}, hdNew: {},
         vacName: '', years: 1, remindDays: 60, place: '', revisit: '',
         dwType: 'external', dwProduct: '', rpt: null };
     } else {
@@ -2314,7 +2331,7 @@ function viewLog(mode, arg) {
       if (!l) return notFound();
       lf = { key, id: l.id, kind: kindOf(l), memberId: l.memberId, symptomId: l.symptomId, date: l.date,
         values: clone(l.values || {}), photos: (l.photos || []).slice(), files: clone(l.files || []), note: l.note || '',
-        healed: !!l.healed, important: !!l.important, vacName: l.vacName || '', years: l.years || 1,
+        healed: !!l.healed, important: !!l.important, hd: clone(l.hd || {}), hdNew: {}, vacName: l.vacName || '', years: l.years || 1,
         remindDays: l.remindDays || 60, place: l.place || '', revisit: l.revisit || '', createdAt: l.createdAt,
         dwType: l.dwType || 'external', dwProduct: l.dwProduct || '', rpt: l.rpt ? clone(l.rpt) : null };
     }
@@ -2511,7 +2528,17 @@ function saveLog() {
   if (k === 'vaccine' && !lf.vacName) { toast('先填疫苗名字'); return; }
   if (k === 'deworm' && !lf.dwProduct) { toast('先选驱虫产品'); return; }
   const l = buildLog();
+  /* 高清照片：留下还在用的，删掉换掉的，新的保存后再上传 */
+  const hdOld = lf.hd || {}, hdNew = lf.hdNew || {};
+  const keys = l.photos.map(photoKey);
+  l.hd = {};
+  const pendingHd = [];
+  keys.forEach(h => {
+    if (hdOld[h]) l.hd[h] = hdOld[h];
+    else if (hdNew[h]) pendingHd.push([h, hdNew[h]]);
+  });
   if (tooBig(l)) return;
+  Object.entries(hdOld).forEach(([h, fid]) => { if (!keys.includes(h)) store.delFile(fid).catch(() => {}); });
   const old = lf.id ? state.logs.get(lf.id) : null;
   const oldCal = old ? logCal(old, null) : null;
   const to = '#/member/' + l.memberId;
@@ -2520,6 +2547,7 @@ function saveLog() {
   saveDoc('logs', l);
   if (cameFrom === to) history.back(); else goReplace(to);
   toast('已保存');
+  if (pendingHd.length) uploadHdPhotos(l.id, pendingHd);
   const c = logCal(l, me);
   if (c && daysUntil(c.date) >= 0 && !(oldCal && oldCal.date === c.date && oldCal.text === c.text)) afterNav(() => askLogCal(l, me));
 }
@@ -2554,15 +2582,324 @@ function revisitIcs(l, me) {
     title: `明天复诊：${me ? me.name : ''}${l.place ? ' · ' + l.place : ''}`,
     desc: `${dot(l.revisit)} 复诊${l.place ? '（' + l.place + '）' : ''}。上次就诊 ${dot(l.date)}。` });
 }
+/* 记录照片的高清版：l.hd = { 照片指纹: 文件 id }，文件分块存在 files 里 */
+function photoKey(s) {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i += 7) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return (h >>> 0).toString(36) + '-' + s.length.toString(36);
+}
+async function putDataUrl(dataUrl) {
+  const b64 = dataUrl.split(',')[1] || '';
+  const fileId = uid();
+  const of = Math.ceil(b64.length / CHUNK);
+  for (let i = 0; i < of; i++) {
+    await store.putPart({ id: `${fileId}_${i}`, fileId, part: i, of, data: b64.slice(i * CHUNK, (i + 1) * CHUNK) });
+  }
+  return fileId;
+}
+async function fileB64(fileId) {
+  const parts = await store.partsOf(fileId);
+  if (!parts.length) return '';
+  parts.sort((a, b) => a.part - b.part);
+  if (parts.length < (parts[0].of || 0)) return '';
+  return parts.map(p => p.data).join('');
+}
+async function uploadHdPhotos(logId, pending) {
+  for (const [h, dataUrl] of pending) {
+    try {
+      const fileId = await putDataUrl(dataUrl);
+      const cur = state.logs.get(logId);
+      if (!cur) { store.delFile(fileId).catch(() => {}); continue; }
+      const c = clone(cur);
+      c.hd = Object.assign({}, c.hd, { [h]: fileId });
+      saveDoc('logs', c);
+    } catch (e) { toast('高清照片上传失败：' + e.message); }
+  }
+}
 function delLog() {
   if (!confirm('删除这条记录？')) return;
   const to = '#/member/' + lf.memberId;
   const id = lf.id;
   (lf.files || []).forEach(f => { Promise.resolve().then(() => store.delFile(f.id)).catch(() => {}); });
+  Object.values(lf.hd || {}).forEach(fid => { Promise.resolve().then(() => store.delFile(fid)).catch(() => {}); });
   const from = cameFrom;
   lf = null;
   delDoc('logs', id);
   if (from === to) history.back(); else goReplace(to);
+}
+
+
+/* ---------- 问诊图：把一次生病的记录生成一页长 PDF ---------- */
+const RP = { W: 600, M: 30, S: 3, font: '-apple-system, "PingFang SC", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif' };
+function b64Bytes(b64) {
+  const bin = atob(b64);
+  const a = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) a[i] = bin.charCodeAt(i);
+  return a;
+}
+function jpegInfo(b) {
+  let i = 2;
+  while (i < b.length) {
+    if (b[i] !== 0xFF) { i++; continue; }
+    const m = b[i + 1];
+    if ((m >= 0xC0 && m <= 0xCF) && m !== 0xC4 && m !== 0xC8 && m !== 0xCC) {
+      return { h: (b[i + 5] << 8) | b[i + 6], w: (b[i + 7] << 8) | b[i + 8], n: b[i + 9] };
+    }
+    i += 2 + ((b[i + 2] << 8) | b[i + 3]);
+  }
+  return null;
+}
+/* 一段文字画成图片：lines = [[{t, size, bold, color}...], ...]，按宽度自动换行 */
+function textImg(lines, wPt, opt) {
+  const o = opt || {};
+  const S = RP.S, pad = (o.pad || 0);
+  const cv = document.createElement('canvas');
+  const ctx = cv.getContext('2d');
+  const fontOf = r => `${r.bold ? 700 : 400} ${r.size * S}px ${RP.font}`;
+  const maxW = (wPt - pad * 2) * S;
+  const rows = [];
+  lines.forEach(line => {
+    let row = { runs: [], w: 0, size: Math.max(...line.map(r => r.size)), gap: line.gap || 0 };
+    rows.push(row);
+    line.forEach(r => {
+      ctx.font = fontOf(r);
+      if (r.badge) { row.runs.push({ r, x: row.w }); row.w += (r.size * 1.25 + 4) * S; return; }
+      let buf = '';
+      for (const ch of String(r.t)) {
+        const tw = ctx.measureText(buf + ch).width;
+        if (ch === '\n' || (row.w + tw > maxW && (buf || row.w))) {
+          if (buf) row.runs.push({ r, t: buf, x: row.w });
+          row = { runs: [], w: 0, size: Math.max(...line.map(x => x.size)), gap: 0 };
+          rows.push(row);
+          buf = ch === '\n' ? '' : ch;
+        } else buf += ch;
+      }
+      if (buf) { ctx.font = fontOf(r); row.runs.push({ r, t: buf, x: row.w }); row.w += ctx.measureText(buf).width; }
+    });
+  });
+  let hPx = pad * S;
+  rows.forEach(rw => { rw.y = hPx + rw.gap * S; hPx = rw.y + rw.size * 1.55 * S; });
+  hPx += pad * S;
+  const minH = (o.minH || 0) * S;
+  cv.width = Math.round(wPt * S);
+  cv.height = Math.max(1, Math.round(Math.max(hPx, minH)));
+  ctx.fillStyle = o.bg || '#ffffff';
+  ctx.fillRect(0, 0, cv.width, cv.height);
+  if (o.bg && o.round) { /* 圆角底色 */
+    ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, cv.width, cv.height);
+    ctx.fillStyle = o.bg;
+    const rr = 10 * S;
+    ctx.beginPath();
+    ctx.moveTo(rr, 0); ctx.arcTo(cv.width, 0, cv.width, cv.height, rr); ctx.arcTo(cv.width, cv.height, 0, cv.height, rr);
+    ctx.arcTo(0, cv.height, 0, 0, rr); ctx.arcTo(0, 0, cv.width, 0, rr); ctx.fill();
+  }
+  ctx.textBaseline = 'middle';
+  rows.forEach(rw => rw.runs.forEach(({ r, t, x }) => {
+    const cy = rw.y + rw.size * 0.775 * S;
+    const x0 = pad * S + x;
+    if (r.badge) {
+      const d = r.size * 1.25 * S;
+      ctx.fillStyle = '#D93025';
+      ctx.beginPath(); ctx.arc(x0 + d / 2, cy, d / 2, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#ffffff'; ctx.font = `700 ${r.size * 0.95 * S}px ${RP.font}`; ctx.textAlign = 'center';
+      ctx.fillText('!', x0 + d / 2, cy + S * 0.5); ctx.textAlign = 'left';
+      return;
+    }
+    ctx.font = fontOf(r);
+    ctx.fillStyle = r.color || '#1D2320';
+    ctx.fillText(t, x0, cy);
+  }));
+  const bytes = b64Bytes(cv.toDataURL('image/jpeg', 0.92).split(',')[1]);
+  return { bytes, w: cv.width, h: cv.height, wPt, hPt: cv.height / S };
+}
+async function photoBytes(l, i) {
+  const p = l.photos[i];
+  const fid = (l.hd || {})[photoKey(p)];
+  if (fid) {
+    const b64 = await fileB64(fid).catch(() => '');
+    if (b64) return b64Bytes(b64);
+  }
+  return b64Bytes(p.split(',')[1] || '');
+}
+function buildPdf(H, items) {
+  /* items: {img:{bytes,w,h,n}, x, y, w, h} 或 {line:[x1,y1,x2,y2]}，坐标从左上角算，单位 pt */
+  const enc = new TextEncoder();
+  const parts = [];
+  let len = 0;
+  const offs = [];
+  const push = x => { const b = typeof x === 'string' ? enc.encode(x) : x; parts.push(b); len += b.length; };
+  const LIM = 14000;
+  const f = H > LIM ? LIM / H : 1;
+  const pw = +(RP.W * f).toFixed(2), ph = +(H * f).toFixed(2);
+  const imgs = items.filter(it => it.img);
+  let cs = `q ${f.toFixed(5)} 0 0 ${f.toFixed(5)} 0 0 cm\n`;
+  items.forEach(it => {
+    if (it.line) {
+      const [x1, y1, x2, y2] = it.line;
+      cs += `0.89 0.906 0.886 RG 0.6 w ${x1} ${H - y1} m ${x2} ${H - y2} l S\n`;
+    } else {
+      it.name = 'Im' + imgs.indexOf(it);
+      cs += `q ${it.w.toFixed(2)} 0 0 ${it.h.toFixed(2)} ${it.x.toFixed(2)} ${(H - it.y - it.h).toFixed(2)} cm /${it.name} Do Q\n`;
+    }
+  });
+  cs += 'Q\n';
+  const csB = enc.encode(cs);
+  const obj = (n, body) => { offs[n] = len; push(`${n} 0 obj\n`); body(); push('\nendobj\n'); };
+  push('%PDF-1.4\n%\xE2\xE3\xCF\xD3\n');
+  const firstImg = 5;
+  obj(1, () => push('<< /Type /Catalog /Pages 2 0 R >>'));
+  obj(2, () => push('<< /Type /Pages /Kids [3 0 R] /Count 1 >>'));
+  obj(3, () => push(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pw} ${ph}] /Contents 4 0 R /Resources << /XObject << ${
+    imgs.map((it, k) => `/Im${k} ${firstImg + k} 0 R`).join(' ')} >> >> >>`));
+  obj(4, () => { push(`<< /Length ${csB.length} >>\nstream\n`); push(csB); push('\nendstream'); });
+  imgs.forEach((it, k) => obj(firstImg + k, () => {
+    const im = it.img;
+    const cspace = im.n === 1 ? '/DeviceGray' : im.n === 4 ? '/DeviceCMYK /Decode [1 0 1 0 1 0 1 0]' : '/DeviceRGB';
+    push(`<< /Type /XObject /Subtype /Image /Width ${im.w} /Height ${im.h} /ColorSpace ${cspace} /BitsPerComponent 8 /Filter /DCTDecode /Length ${im.bytes.length} >>\nstream\n`);
+    push(im.bytes);
+    push('\nendstream');
+  }));
+  const n = firstImg + imgs.length;
+  const xref = len;
+  let x = `xref\n0 ${n}\n0000000000 65535 f \n`;
+  for (let i = 1; i < n; i++) x += String(offs[i]).padStart(10, '0') + ' 00000 n \n';
+  push(x);
+  push(`trailer\n<< /Size ${n} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`);
+  return new Blob(parts, { type: 'application/pdf' });
+}
+function reportRuns(l, from, withDay) {
+  const out = [];
+  const head = [];
+  if (l.important) head.push({ badge: true, size: 13 });
+  head.push({ t: dot(l.date).slice(5), size: 15, bold: true });
+  if (withDay) head.push({ t: '　第 ' + (Math.round((parseYmd(l.date) - parseYmd(from)) / 86400000) + 1) + ' 天', size: 10, color: '#5A635E' });
+  if (l.healed) head.push({ t: '　已痊愈', size: 10, bold: true, color: '#2E6A4C' });
+  out.push(head);
+  return out;
+}
+function bodyRuns(l, size) {
+  const out = [];
+  summaryParts(l).forEach((p, i) => {
+    const line = [{ t: p.label + ' ', size, bold: true }, { t: p.value, size, color: '#3A423E' }];
+    line.gap = i ? 1 : 3;
+    out.push(line);
+  });
+  if (l.note) { const line = [{ t: l.note, size, color: '#3A423E' }]; line.gap = 3; out.push(line); }
+  return out;
+}
+async function makeReport(key, layout) {
+  const rows = [...state.logs.values()].filter(l => episodeKeyOf(l) === key).sort((a, b) => a.date.localeCompare(b.date));
+  if (!rows.length) return null;
+  const first = rows[0];
+  const me = state.members.get(first.memberId) || {};
+  const done = rows.some(l => l.healed);
+  const from = first.date, to = done ? rows[rows.length - 1].date : todayStr();
+  const days = Math.round((parseYmd(to) - parseYmd(from)) / 86400000) + 1;
+  const { W, M } = RP, CW = W - M * 2;
+  const items = [];
+  let y = M;
+  const put = (img, x, yy, w, h) => { items.push({ img, x, y: yy, w, h }); };
+  const putText = (t, x, yy) => { put({ bytes: t.bytes, w: t.w, h: t.h, n: 3 }, x, yy, t.wPt, t.hPt); return t.hPt; };
+  const putPhoto = async (l, i, x, yy, size) => {
+    const bytes = await photoBytes(l, i);
+    const info = jpegInfo(bytes) || { w: PHOTO_PX, h: PHOTO_PX, n: 3 };
+    put({ bytes, w: info.w, h: info.h, n: info.n }, x, yy, size, size);
+  };
+  y += putText(textImg([
+    [{ t: `${me.name || ''} · ${symName(first.symptomId)}`, size: 22, bold: true }],
+    Object.assign([{ t: `${dot(from)} – ${dot(to)} · ${days} 天 · ${rows.length} 条记录　`, size: 11, color: '#5A635E' },
+      { t: done ? '已痊愈' : '还没好', size: 11, bold: true, color: done ? '#2E6A4C' : '#8A4F00' }], { gap: 4 })
+  ], CW), M, y) + 14;
+  items.push({ line: [M, y, W - M, y] });
+  y += 16;
+  if (layout === 'grid') {
+    const gap = 14, col = (CW - gap) / 2;
+    for (let i = 0; i < rows.length; i += 2) {
+      let rowH = 0;
+      for (let j = 0; j < 2 && rows[i + j]; j++) {
+        const l = rows[i + j], x = M + j * (col + gap);
+        let yy = y;
+        const ph = l.photos || [];
+        if (ph.length) {
+          await putPhoto(l, 0, x, yy, col);
+          yy += col;
+          if (ph.length > 1) {
+            const t = (col - 12) / 3;
+            for (let k = 1; k < ph.length; k++) await putPhoto(l, k, x + (k - 1) * (t + 6), yy + 6, t);
+            yy += 6 + t;
+          }
+          yy += 6;
+          yy += putText(textImg(reportRuns(l, from, true).concat(bodyRuns(l, 9.5)), col), x, yy);
+        } else {
+          yy += putText(textImg(bodyRuns(l, 12), col, { bg: '#F3F5F1', round: true, pad: 14, minH: col }), x, yy) + 6;
+          yy += putText(textImg(reportRuns(l, from, true), col), x, yy);
+        }
+        rowH = Math.max(rowH, yy - y);
+      }
+      y += rowH + 20;
+    }
+  } else {
+    const dw = 82, gap = 14, rw = CW - dw - gap;
+    for (const l of rows) {
+      let yy = y, ly = y;
+      const dl = reportRuns(l, from, false);
+      const dayN = Math.round((parseYmd(l.date) - parseYmd(from)) / 86400000) + 1;
+      const left = dl.concat([Object.assign([{ t: `第 ${dayN} 天`, size: 10, color: '#5A635E' }], { gap: 2 })]);
+      if (l.healed) { left[0] = left[0].filter(r => !/已痊愈/.test(r.t || '')); left.push(Object.assign([{ t: '已痊愈', size: 10, bold: true, color: '#2E6A4C' }], { gap: 2 })); }
+      ly += putText(textImg(left, dw), M, y);
+      const ph = l.photos || [];
+      if (ph.length) {
+        const n = ph.length, sz = (rw - (n - 1) * 8) / n;
+        for (let k = 0; k < n; k++) await putPhoto(l, k, M + dw + gap + k * (sz + 8), yy, sz);
+        yy += sz + 8;
+      }
+      const body = bodyRuns(l, 10);
+      if (body.length) yy += putText(textImg(body, rw), M + dw + gap, yy);
+      y = Math.max(yy, ly) + 14;
+      items.push({ line: [M, y, W - M, y] });
+      y += 14;
+    }
+  }
+  y += putText(textImg([[{ t: `健康簿 · ${dot(todayStr())} 生成`, size: 9, color: '#9AA39E' }]], CW), M, y) + M;
+  return { blob: buildPdf(y, items), name: `${me.name || ''} ${symName(first.symptomId)} 问诊记录 ${todayStr()}.pdf` };
+}
+let reportOut = null;
+function openReportSheet(key) {
+  showLayer(`<div class="scrim" data-act="close"></div>
+    <div class="sheet menu-sheet" role="dialog" aria-label="生成问诊图">
+      <h2 class="sheet-t">生成问诊图</h2>
+      <p>把这一次的所有记录排成一页长 PDF，从旧到新，照片用高清版</p>
+      <button data-act="rep-make" data-k="${esc(key)}" data-v="grid"><span>两列网格</span><span class="muted">一格一天，更紧凑</span></button>
+      <button data-act="rep-make" data-k="${esc(key)}" data-v="axis"><span>左边日期</span><span class="muted">照片更大，看得出第几天</span></button>
+      <button data-act="close">取消</button>
+    </div>`);
+}
+async function runReport(key, layout) {
+  showLayer(`<div class="scrim"></div><div class="sheet" role="dialog" aria-label="正在生成"><h2 class="sheet-t">正在生成…</h2><p>照片多的话要等几秒</p></div>`);
+  try {
+    const r = await makeReport(key, layout);
+    if (!r) { closeLayer(); toast('没有记录'); return; }
+    reportOut = r;
+    const mb = (r.blob.size / 1048576).toFixed(1);
+    showLayer(`<div class="scrim" data-act="close"></div>
+      <div class="sheet" role="dialog" aria-label="问诊图好了">
+        <h2 class="sheet-t">问诊图好了</h2>
+        <p>${esc(r.name)}（${mb} MB）</p>
+        <div class="actions2">
+          <button class="btn" data-act="rep-open">打开看看</button>
+          <button class="btn primary" data-act="rep-share">分享 / 存储</button>
+        </div></div>`);
+  } catch (e) {
+    closeLayer();
+    toast('生成失败：' + e.message);
+  }
+}
+function openBlob(blob, name) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 120000);
 }
 
 /* ---------- 板块与选项的管理 ---------- */
@@ -2966,9 +3303,21 @@ const actions = {
         <button class="danger" data-act="lph-del" data-i="${i}">删除这张</button>
         <button data-act="close">取消</button></div>`);
   },
-  'lph-edit': el => {
+  'lph-edit': async el => {
     const i = Number(el.dataset.i);
-    openCropper(lf.photos[i], data => { lf.photos[i] = data; render(); });
+    const h = photoKey(lf.photos[i]);
+    let src = lf.hdNew[h] || '';
+    if (!src && lf.hd[h]) {
+      toast('正在读取高清照片…');
+      const b64 = await fileB64(lf.hd[h]).catch(() => '');
+      if (b64) src = 'data:image/jpeg;base64,' + b64;
+    }
+    if (!lf) return;
+    openCropper(src || lf.photos[i], (data, hd) => {
+      lf.photos[i] = data;
+      if (hd) lf.hdNew[photoKey(data)] = hd;
+      render();
+    }, null, { hd: true });
   },
   'lph-replace': el => {
     photoPending = { target: 'log', mode: 'replace', i: Number(el.dataset.i) };
@@ -3050,6 +3399,16 @@ const actions = {
       state.calDay = '';
     }
     render();
+  },
+  'ep-report': el => openReportSheet(el.dataset.k),
+  'rep-make': el => runReport(el.dataset.k, el.dataset.v),
+  'rep-open': () => { if (reportOut) openBlob(reportOut.blob, reportOut.name); },
+  'rep-share': async () => {
+    if (!reportOut) return;
+    const file = new File([reportOut.blob], reportOut.name, { type: 'application/pdf' });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      try { await navigator.share({ files: [file], title: reportOut.name }); } catch (e) { /* 取消分享 */ }
+    } else openBlob(reportOut.blob, reportOut.name);
   },
   'ep-toggle': el => {
     const k = el.dataset.k;
@@ -3318,13 +3677,14 @@ document.addEventListener('change', async e => {
     }
     const url = URL.createObjectURL(picked);
     const pending = photoPending || { mode: 'add' };
-    const done = data => {
+    const done = (data, hd) => {
       photoPending = null;
       if (pending.target === 'member') { if (mform) { mform.photo = data; render(); } return; }
       if (pending.target === 'log') {
         if (!lf) return;
         if (pending.mode === 'replace') lf.photos[pending.i] = data;
         else if (lf.photos.length < 3) lf.photos.push(data);
+        if (hd) lf.hdNew[photoKey(data)] = hd;
         render();
         return;
       }
@@ -3333,7 +3693,7 @@ document.addEventListener('change', async e => {
       else if (form.photos.length < MAX_PHOTOS) form.photos.push(data);
       render();
     };
-    openCropper(url, done, () => URL.revokeObjectURL(url));
+    openCropper(url, done, () => URL.revokeObjectURL(url), { hd: pending.target === 'log' });
     t.value = '';
   } else if (t.id === 'lfile-in' && t.files && t.files[0]) {
     const f = t.files[0];
