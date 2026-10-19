@@ -382,7 +382,7 @@ const BOXES = { cat: '猫用药', human: '人用药' };
 const REMIND_OPTIONS = [30, 60, 120];
 const LOG_TEXT = { add: '添加', in: '入库', use: '用完', open: '开封' };
 const FB_VER = '10.12.2';
-const APP_VER = '2026.10.18-78';
+const APP_VER = '2026.10.18-79';
 const MAX_PHOTOS = 6;
 const PHOTO_PX = 640;
 const PHOTO_Q = 0.62;
@@ -2655,7 +2655,7 @@ function textImg(lines, wPt, opt) {
   const S = RP.S, pad = (o.pad || 0);
   const cv = document.createElement('canvas');
   const ctx = cv.getContext('2d');
-  const fontOf = r => `${r.bold ? 700 : 400} ${r.size * S}px ${RP.font}`;
+  const fontOf = r => `${r.italic ? 'italic ' : ''}${r.bold ? 700 : 400} ${r.size * S}px ${RP.font}`;
   const maxW = (wPt - pad * 2) * S;
   const rows = [];
   lines.forEach(line => {
@@ -2780,7 +2780,7 @@ function reportRuns(l, from, withDay) {
 function bodyRuns(l, size) {
   const out = [];
   summaryParts(l).forEach((p, i) => {
-    const line = [{ t: p.label + ' ', size, bold: true }, { t: p.value, size, color: '#3A423E' }];
+    const line = [{ t: p.label + ' ', size, bold: true }, { t: p.value, size, italic: true, color: '#3A423E' }];
     line.gap = i ? 1 : 3;
     out.push(line);
   });
