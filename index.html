@@ -382,7 +382,7 @@ const BOXES = { cat: '猫用药', human: '人用药' };
 const REMIND_OPTIONS = [30, 60, 120];
 const LOG_TEXT = { add: '添加', in: '入库', use: '用完', open: '开封' };
 const FB_VER = '10.12.2';
-const APP_VER = '2026.10.18-79';
+const APP_VER = '2026.10.18-80';
 const MAX_PHOTOS = 6;
 const PHOTO_PX = 640;
 const PHOTO_Q = 0.62;
@@ -2862,7 +2862,7 @@ async function makeReport(key, layout) {
     }
   }
   y += putText(textImg([[{ t: `健康簿 · ${dot(todayStr())} 生成`, size: 9, color: '#9AA39E' }]], CW), M, y) + M;
-  return { blob: buildPdf(y, items), name: `${me.name || ''} ${symName(first.symptomId)} 问诊记录 ${todayStr()}.pdf` };
+  return { blob: buildPdf(y, items), name: `${me.name || ''} ${symName(first.symptomId)} ${dot(from)}-${dot(to)}.pdf` };
 }
 let reportOut = null;
 function openReportSheet(key) {
