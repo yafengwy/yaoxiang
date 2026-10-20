@@ -382,7 +382,7 @@ const BOXES = { cat: '猫用药', human: '人用药' };
 const REMIND_OPTIONS = [30, 60, 120];
 const LOG_TEXT = { add: '添加', in: '入库', use: '用完', open: '开封' };
 const FB_VER = '10.12.2';
-const APP_VER = '2026.10.18-81';
+const APP_VER = '2026.10.20-82';
 const MAX_PHOTOS = 6;
 const PHOTO_PX = 640;
 const PHOTO_Q = 0.62;
@@ -542,6 +542,57 @@ function loadScript(src) {
     document.head.appendChild(s);
   });
 }
+/* 云端数据在手机上留一份副本：打开 App 先用副本马上显示，云端连上后再更新。
+   这份副本是自己存的，跟 Firestore 的离线缓存无关，Safari 断开它也不影响保存。 */
+const LocalCopy = {
+  db: null, timer: null, dirty: new Set(),
+  open() {
+    if (this.db) return Promise.resolve(this.db);
+    return new Promise(res => {
+      try {
+        const r = indexedDB.open('yaoxiang-copy', 1);
+        r.onupgradeneeded = () => r.result.createObjectStore('cols');
+        r.onsuccess = () => {
+          this.db = r.result;
+          this.db.onclose = () => { this.db = null; };
+          this.db.onversionchange = () => { this.db.close(); this.db = null; };
+          res(this.db);
+        };
+        r.onerror = () => res(null);
+        r.onblocked = () => res(null);
+      } catch (e) { res(null); }
+    });
+  },
+  async load(uid) {
+    const db = await this.open();
+    if (!db) return null;
+    return new Promise(res => {
+      try {
+        const t = db.transaction('cols');
+        const q = t.objectStore('cols').get(uid);
+        q.onsuccess = () => res(q.result || null);
+        q.onerror = () => res(null);
+      } catch (e) { this.db = null; res(null); }
+    });
+  },
+  mark(uid) {
+    clearTimeout(this.timer);
+    this.timer = setTimeout(() => this.save(uid), 1500);
+  },
+  async save(uid) {
+    if (!uid || state.user && state.user.uid !== uid) return;
+    const db = await this.open();
+    if (!db) return;
+    const data = { at: Date.now() };
+    COLS.forEach(c => { data[c] = [...state[c].values()]; });
+    try { db.transaction('cols', 'readwrite').objectStore('cols').put(data, uid); } catch (e) { this.db = null; }
+  },
+  async clear() {
+    const db = await this.open();
+    if (!db) return;
+    try { db.transaction('cols', 'readwrite').objectStore('cols').clear(); } catch (e) { this.db = null; }
+  }
+};
 const CloudStore = {
   auth: null, fs: null, uid: null, unsubs: [],
   async init() {
@@ -559,18 +610,41 @@ const CloudStore = {
       COLS.forEach(c => state[c].clear());
       state.user = user;
       this.uid = user ? user.uid : null;
-      if (!user) { state.ready = true; render(); return; }
+      if (!user) { state.ready = true; LocalCopy.clear(); render(); return; }
       state.ready = false;
       render();
-      let loaded = 0;
+      const uid = user.uid;
+      const fresh = new Set();
+      let gotServer = false;
+      /* 先用手机里的副本马上显示 */
+      LocalCopy.load(uid).then(copy => {
+        if (!copy || state.ready || this.uid !== uid) return;
+        COLS.forEach(c => { if (!fresh.has(c)) (copy[c] || []).forEach(d => state[c].set(d.id, d)); });
+        state.ready = true;
+        render();
+        flushPending();
+      });
       COLS.forEach(c => {
-        this.unsubs.push(this.col(c).onSnapshot(snap => {
-          snap.docChanges().forEach(ch => {
-            if (ch.type === 'removed') state[c].delete(ch.doc.id);
-            else state[c].set(ch.doc.id, ch.doc.data());
-          });
-          loaded++;
-          if (loaded >= COLS.length && !state.ready) { state.ready = true; flushPending(); }
+        this.unsubs.push(this.col(c).onSnapshot({ includeMetadataChanges: true }, snap => {
+          /* 连不上云端时 Firestore 会先给一份空的「本地」结果，不能拿它当真 */
+          if (!fresh.has(c) && snap.metadata.fromCache) return;
+          if (fresh.has(c) && !snap.docChanges().length) return;
+          if (!fresh.has(c)) {
+            /* 云端第一次回来：整份替换，副本里多出来的（在别的手机上删掉的）也一起去掉 */
+            fresh.add(c);
+            state[c].clear();
+            snap.docs.forEach(d => state[c].set(d.id, d.data()));
+          } else {
+            snap.docChanges().forEach(ch => {
+              if (ch.type === 'removed') state[c].delete(ch.doc.id);
+              else state[c].set(ch.doc.id, ch.doc.data());
+            });
+          }
+          if (fresh.size >= COLS.length && !gotServer) {
+            gotServer = true;
+            if (!state.ready) { state.ready = true; flushPending(); }
+          }
+          if (gotServer) LocalCopy.mark(uid);
           render();
         }, err => toast('同步出错：' + err.message)));
       });
