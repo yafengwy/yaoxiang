@@ -382,7 +382,7 @@ const BOXES = { cat: '猫用药', human: '人用药' };
 const REMIND_OPTIONS = [30, 60, 120];
 const LOG_TEXT = { add: '添加', in: '入库', use: '用完', open: '开封' };
 const FB_VER = '10.12.2';
-const APP_VER = '2026.10.21-83';
+const APP_VER = '2026.10.21-84';
 const MAX_PHOTOS = 6;
 const PHOTO_PX = 640;
 const PHOTO_Q = 0.62;
@@ -2771,7 +2771,7 @@ function textImg(lines, wPt, opt) {
   const cv = document.createElement('canvas');
   const ctx = cv.getContext('2d');
   const fontOf = r => `${r.italic ? 'italic ' : ''}${r.bold ? 700 : 400} ${r.size * S}px ${RP.font}`;
-  const maxW = (wPt - pad * 2) * S;
+  const maxW = (wPt - pad * 2 - 8) * S; /* 留 8pt 给不能放行首的标点 */
   const rows = [];
   lines.forEach(line => {
     let row = { runs: [], w: 0, size: Math.max(...line.map(r => r.size)), gap: line.gap || 0 };
@@ -2782,7 +2782,9 @@ function textImg(lines, wPt, opt) {
       let buf = '';
       for (const ch of String(r.t)) {
         const tw = ctx.measureText(buf + ch).width;
-        if (ch === '\n' || (row.w + tw > maxW && (buf || row.w))) {
+        /* 句号逗号这类标点不放到行首，宁可这一行稍微超一点 */
+        const noHead = /[，。、！？；：）」』”’》,.!?;:)]/.test(ch);
+        if (ch === '\n' || (row.w + tw > maxW && (buf || row.w) && !noHead)) {
           if (buf) row.runs.push({ r, t: buf, x: row.w });
           row = { runs: [], w: 0, size: Math.max(...line.map(x => x.size)), gap: 0 };
           rows.push(row);
@@ -2964,13 +2966,17 @@ async function makeReport(key, layout) {
       if (l.healed) { left[0] = left[0].filter(r => !/已痊愈/.test(r.t || '')); left.push(Object.assign([{ t: '已痊愈', size: 14, bold: true, color: '#2E6A4C' }], { gap: 3 })); }
       ly += putText(textImg(left, dw), M, y);
       const ph = l.photos || [];
+      const body = bodyRuns(l, 10);
       if (ph.length) {
+        /* 有照片：照片占满右边，字放在左边日期下面 */
         const n = ph.length, sz = (rw - (n - 1) * 8) / n;
         for (let k = 0; k < n; k++) await putPhoto(l, k, M + dw + gap + k * (sz + 8), yy, sz);
-        yy += sz + 8;
+        yy += sz;
+        if (body.length) ly += 6 + putText(textImg(body, dw), M, ly + 6);
+      } else if (body.length) {
+        /* 没照片：字还是放在右边 */
+        yy += putText(textImg(body, rw), M + dw + gap, yy);
       }
-      const body = bodyRuns(l, 10);
-      if (body.length) yy += putText(textImg(body, rw), M + dw + gap, yy);
       y = Math.max(yy, ly) + 14;
       items.push({ line: [M, y, W - M, y] });
       y += 14;
