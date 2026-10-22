@@ -382,7 +382,7 @@ const BOXES = { cat: '猫用药', human: '人用药' };
 const REMIND_OPTIONS = [30, 60, 120];
 const LOG_TEXT = { add: '添加', in: '入库', use: '用完', open: '开封' };
 const FB_VER = '10.12.2';
-const APP_VER = '2026.10.20-82';
+const APP_VER = '2026.10.21-83';
 const MAX_PHOTOS = 6;
 const PHOTO_PX = 640;
 const PHOTO_Q = 0.62;
@@ -2882,11 +2882,11 @@ function buildPdf(H, items) {
   push(`trailer\n<< /Size ${n} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`);
   return new Blob(parts, { type: 'application/pdf' });
 }
-function reportRuns(l, from, withDay) {
+function reportRuns(l, from, withDay, big) {
   const out = [];
   const head = [];
-  if (l.important) head.push({ badge: true, size: 13 });
-  head.push({ t: dot(l.date).slice(5), size: 15, bold: true });
+  if (l.important) head.push({ badge: true, size: big ? 19 : 13 });
+  head.push({ t: dot(l.date).slice(5), size: big ? 24 : 15, bold: true });
   if (withDay) head.push({ t: '　第 ' + (Math.round((parseYmd(l.date) - parseYmd(from)) / 86400000) + 1) + ' 天', size: 10, color: '#5A635E' });
   if (l.healed) head.push({ t: '　已痊愈', size: 10, bold: true, color: '#2E6A4C' });
   out.push(head);
@@ -2955,13 +2955,13 @@ async function makeReport(key, layout) {
       y += rowH + 20;
     }
   } else {
-    const dw = 82, gap = 14, rw = CW - dw - gap;
+    const dw = 112, gap = 14, rw = CW - dw - gap;
     for (const l of rows) {
       let yy = y, ly = y;
-      const dl = reportRuns(l, from, false);
+      const dl = reportRuns(l, from, false, true);
       const dayN = Math.round((parseYmd(l.date) - parseYmd(from)) / 86400000) + 1;
-      const left = dl.concat([Object.assign([{ t: `第 ${dayN} 天`, size: 10, color: '#5A635E' }], { gap: 2 })]);
-      if (l.healed) { left[0] = left[0].filter(r => !/已痊愈/.test(r.t || '')); left.push(Object.assign([{ t: '已痊愈', size: 10, bold: true, color: '#2E6A4C' }], { gap: 2 })); }
+      const left = dl.concat([Object.assign([{ t: `第 ${dayN} 天`, size: 14, color: '#5A635E' }], { gap: 3 })]);
+      if (l.healed) { left[0] = left[0].filter(r => !/已痊愈/.test(r.t || '')); left.push(Object.assign([{ t: '已痊愈', size: 14, bold: true, color: '#2E6A4C' }], { gap: 3 })); }
       ly += putText(textImg(left, dw), M, y);
       const ph = l.photos || [];
       if (ph.length) {
