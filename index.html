@@ -382,7 +382,7 @@ const BOXES = { cat: '猫用药', human: '人用药' };
 const REMIND_OPTIONS = [30, 60, 120];
 const LOG_TEXT = { add: '添加', in: '入库', use: '用完', open: '开封' };
 const FB_VER = '10.12.2';
-const APP_VER = '2026.10.21-84';
+const APP_VER = '2026.10.21-85';
 const MAX_PHOTOS = 6;
 const PHOTO_PX = 640;
 const PHOTO_Q = 0.62;
@@ -2966,12 +2966,14 @@ async function makeReport(key, layout) {
       if (l.healed) { left[0] = left[0].filter(r => !/已痊愈/.test(r.t || '')); left.push(Object.assign([{ t: '已痊愈', size: 14, bold: true, color: '#2E6A4C' }], { gap: 3 })); }
       ly += putText(textImg(left, dw), M, y);
       const ph = l.photos || [];
-      const body = bodyRuns(l, 10);
+      const body = bodyRuns(l, 11.5);
       if (ph.length) {
-        /* 有照片：照片占满右边，字放在左边日期下面 */
-        const n = ph.length, sz = (rw - (n - 1) * 8) / n;
-        for (let k = 0; k < n; k++) await putPhoto(l, k, M + dw + gap + k * (sz + 8), yy, sz);
-        yy += sz;
+        /* 有照片：照片占满右边（一行最多两张），字放在左边日期下面 */
+        const n = ph.length, per = Math.min(n, 2), sz = (rw - (per - 1) * 8) / per;
+        for (let k = 0; k < n; k++) {
+          await putPhoto(l, k, M + dw + gap + (k % 2) * (sz + 8), yy + Math.floor(k / 2) * (sz + 8), sz);
+        }
+        yy += Math.ceil(n / per) * (sz + 8) - 8;
         if (body.length) ly += 6 + putText(textImg(body, dw), M, ly + 6);
       } else if (body.length) {
         /* 没照片：字还是放在右边 */
