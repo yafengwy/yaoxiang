@@ -12,7 +12,8 @@
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" href="icon-192.png">
 <title>健康簿</title>
-<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600&display=swap" rel="stylesheet">
+<!-- 字体不挡页面：国内连不上 Google 时先用系统字体 -->
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
 <style>
 :root{
   --bg:#EEF1EC; --card:#FFFFFF; --ink:#1D2320; --muted:#5A635E; --line:#DDE2DC;
@@ -382,7 +383,7 @@ const BOXES = { cat: '猫用药', human: '人用药' };
 const REMIND_OPTIONS = [30, 60, 120];
 const LOG_TEXT = { add: '添加', in: '入库', use: '用完', open: '开封' };
 const FB_VER = '10.12.2';
-const APP_VER = '2026.10.21-86';
+const APP_VER = '2026.10.27-87';
 const MAX_PHOTOS = 6;
 const PHOTO_PX = 640;
 const PHOTO_Q = 0.62;
@@ -595,7 +596,24 @@ const LocalCopy = {
 };
 const CloudStore = {
   auth: null, fs: null, uid: null, unsubs: [],
+  early: '',
   async init() {
+    /* 先不等 Firebase：上次登录过的话，直接用手机里的副本显示（国内没 VPN 时也能看） */
+    let lastUid = '';
+    try { lastUid = localStorage.getItem('yaoxiang-uid') || ''; } catch (e) { /* 无痕模式 */ }
+    if (lastUid) {
+      const copy = await LocalCopy.load(lastUid);
+      if (copy && !state.ready) {
+        COLS.forEach(c => (copy[c] || []).forEach(d => state[c].set(d.id, d)));
+        applyPending();
+        let email = '';
+        try { email = localStorage.getItem('yaoxiang-email') || ''; } catch (e) { /* 无痕模式 */ }
+        state.user = { uid: lastUid, email, early: true };
+        state.ready = true;
+        this.early = lastUid;
+        render();
+      }
+    }
     const base = `https://www.gstatic.com/firebasejs/${FB_VER}/`;
     await loadScript(base + 'firebase-app-compat.js');
     await loadScript(base + 'firebase-auth-compat.js');
@@ -607,12 +625,18 @@ const CloudStore = {
     this.auth.onAuthStateChanged(user => {
       this.unsubs.forEach(u => u());
       this.unsubs = [];
-      COLS.forEach(c => state[c].clear());
+      const keep = user && this.early === user.uid && state.ready;
+      this.early = '';
       state.user = user;
       this.uid = user ? user.uid : null;
-      if (!user) { state.ready = true; LocalCopy.clear(); render(); return; }
-      state.ready = false;
-      render();
+      try {
+        if (user) { localStorage.setItem('yaoxiang-uid', user.uid); localStorage.setItem('yaoxiang-email', user.email || ''); }
+        else { localStorage.removeItem('yaoxiang-uid'); localStorage.removeItem('yaoxiang-email'); }
+      } catch (e) { /* 无痕模式 */ }
+      if (!keep) COLS.forEach(c => state[c].clear());
+      if (!user) { state.ready = true; LocalCopy.clear(); writePending([]); render(); return; }
+      if (keep) flushPending();
+      else { state.ready = false; render(); }
       const uid = user.uid;
       const fresh = new Set();
       let gotServer = false;
@@ -620,6 +644,7 @@ const CloudStore = {
       LocalCopy.load(uid).then(copy => {
         if (!copy || state.ready || this.uid !== uid) return;
         COLS.forEach(c => { if (!fresh.has(c)) (copy[c] || []).forEach(d => state[c].set(d.id, d)); });
+        applyPending();
         state.ready = true;
         render();
         flushPending();
@@ -634,6 +659,7 @@ const CloudStore = {
             fresh.add(c);
             state[c].clear();
             snap.docs.forEach(d => state[c].set(d.id, d.data()));
+            readPending().filter(j => j.col === c).forEach(j => { if (j.del) state[c].delete(j.id); else state[c].set(j.id, j.d); });
           } else {
             snap.docChanges().forEach(ch => {
               if (ch.type === 'removed') state[c].delete(ch.doc.id);
@@ -653,7 +679,7 @@ const CloudStore = {
   col(c) { return this.fs.collection('users').doc(this.uid).collection(c); },
   put(c, d) { return this.col(c).doc(d.id).set(clone(d)); },
   del(c, id) { return this.col(c).doc(id).delete(); },
-  logout() { return this.auth.signOut(); },
+  logout() { return this.auth ? this.auth.signOut() : Promise.reject(new Error('还没连上云端，稍后再试')); },
   putPart(d) { return this.col('files').doc(d.id).set(d); },
   async partsOf(fileId) {
     const snap = await this.col('files').where('fileId', '==', fileId).get();
@@ -684,36 +710,62 @@ function writeFailed(e, job) {
     toast((job.del ? '删除失败：' : '保存失败：') + msg);
     return;
   }
-  const list = readPending().filter(x => !(x.col === job.col && x.id === job.id));
-  list.push(job);
-  if (!writePending(list)) { toast('保存失败：' + msg); return; }
+  if (!readPending().some(x => x.col === job.col && x.id === job.id)) { toast('保存失败：' + msg); return; }
   if (reconnecting) return;
   reconnecting = true;
   toast('连接断了，正在重新连接，刚才的内容会自动补存');
   setTimeout(() => location.reload(), 1200);
 }
+/* 手机里还没存进云端的改动，盖到显示的数据上 */
+function applyPending() {
+  readPending().forEach(j => {
+    if (!state[j.col]) return;
+    if (j.del) state[j.col].delete(j.id); else state[j.col].set(j.id, j.d);
+  });
+}
+function addPending(job) {
+  job.t = Date.now() + Math.random();
+  const list = readPending().filter(x => !(x.col === job.col && x.id === job.id));
+  list.push(job);
+  writePending(list);
+  return job.t;
+}
+function donePending(col, id, t) {
+  const list = readPending();
+  const left = list.filter(x => !(x.col === col && x.id === id && x.t === t));
+  if (left.length !== list.length) writePending(left);
+}
+let flushing = false;
 async function flushPending() {
+  if (flushing || store !== CloudStore || !CloudStore.uid) return;
   const list = readPending();
   if (!list.length) return;
-  const left = [];
-  for (const job of list) {
-    try {
-      if (job.del) { await store.del(job.col, job.id); state[job.col].delete(job.id); }
-      else { await store.put(job.col, job.d); state[job.col].set(job.id, job.d); }
-    } catch (e) { left.push(job); }
-  }
-  writePending(left);
-  render();
-  toast(left.length ? `还有 ${left.length} 条没存上，稍后会再试` : `已补存 ${list.length} 条改动`);
+  flushing = true;
+  let ok = 0;
+  await Promise.all(list.map(job => (job.del ? store.del(job.col, job.id) : store.put(job.col, job.d))
+    .then(() => { donePending(job.col, job.id, job.t); ok++; })
+    .catch(() => { /* 留着下次再补 */ })));
+  flushing = false;
+  if (ok) toast(`已补存 ${ok} 条改动`);
+}
+/* 云端模式：每次改动先记在手机里，云端确认存好了再划掉。连不上（国内没 VPN、断网）时关掉 App 也不会丢 */
+function writeDoc(job) {
+  const cloud = store === CloudStore;
+  const t = cloud ? addPending(job) : 0;
+  if (cloud && !CloudStore.uid) return;   /* Firebase 还没连上：先放手机里，连上后自动补存 */
+  Promise.resolve()
+    .then(() => job.del ? store.del(job.col, job.id) : store.put(job.col, job.d))
+    .then(() => { if (cloud) donePending(job.col, job.id, t); })
+    .catch(e => writeFailed(e, job));
 }
 function saveDoc(col, d) {
   state[col].set(d.id, d);
   render();
-  Promise.resolve().then(() => store.put(col, d)).catch(e => writeFailed(e, { col, id: d.id, d }));
+  writeDoc({ col, id: d.id, d });
 }
 function delDoc(col, id) {
   state[col].delete(id);
-  Promise.resolve().then(() => store.del(col, id)).catch(e => writeFailed(e, { col, id, del: true }));
+  writeDoc({ col, id, del: true });
 }
 function save(m) { saveDoc('meds', m); }
 
@@ -3210,9 +3262,12 @@ async function doUpdate() {
   closeLayer();
   toast('正在更新…');
   try {
+    /* 只清掉本站的页面缓存，Firebase 脚本和字体留着（国内重新下载不了） */
     if (window.caches && caches.keys) {
-      const ks = await caches.keys();
-      await Promise.all(ks.map(k => caches.delete(k)));
+      for (const k of await caches.keys()) {
+        const c = await caches.open(k);
+        for (const req of await c.keys()) if (new URL(req.url).origin === location.origin) await c.delete(req);
+      }
     }
   } catch (e) { /* ignore */ }
   try {
@@ -3724,7 +3779,7 @@ const actions = {
   'del-med': delMed,
   login: () => doAuth('login'),
   reset: () => doAuth('reset'),
-  logout: () => { if (confirm('退出登录？')) store.logout(); },
+  logout: () => { if (confirm('退出登录？')) Promise.resolve().then(() => store.logout()).catch(e => toast(e.message)); },
   'check-update': () => checkUpdate(true),
   'do-update': doUpdate,
   export: exportData,
