@@ -164,6 +164,7 @@ button.tag{height:34px;padding:0 12px;font-size:14px;border-radius:10px;display:
 .field-l{font-size:14px;font-weight:500;color:var(--muted);margin:22px 4px 10px;display:flex;align-items:center;gap:10px}
 .field-l::after,.sec-head::after{content:'';flex:1;height:1px;background:var(--line);order:1}
 .field-l>:not(:first-child),.sec-head>:not(:first-child){order:2}
+.sc-steps p{margin:0 0 10px;line-height:1.6}
 .row-l .link-btn{min-height:24px;padding:0;font-size:14px}
 
 .form .card{margin-top:16px}
@@ -383,7 +384,7 @@ const BOXES = { cat: '猫用药', human: '人用药' };
 const REMIND_OPTIONS = [30, 60, 120];
 const LOG_TEXT = { add: '添加', in: '入库', use: '用完', open: '开封' };
 const FB_VER = '10.12.2';
-const APP_VER = '2026.10.27-87';
+const APP_VER = '2026.11.05-88';
 const MAX_PHOTOS = 6;
 const PHOTO_PX = 640;
 const PHOTO_Q = 0.62;
@@ -437,6 +438,7 @@ const P = {
   minus: '<path d="M5 12h14"/>',
   close: '<path d="M6 6l12 12M18 6L6 18"/>',
   cal: '<rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/>',
+  bell: '<path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20a2 2 0 0 0 4 0"/>',
   gear: '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M2 12h3M19 12h3M4.9 19.1L7 17M17 7l2.1-2.1"/>',
   cat: '<path d="M5 3l3.5 5h7L19 3v10a7 7 0 0 1-14 0z"/><circle cx="9.5" cy="12.5" r=".6"/><circle cx="14.5" cy="12.5" r=".6"/><path d="M11.2 15.4h1.6L12 16.3z"/>',
   person: '<circle cx="12" cy="8" r="3.5"/><path d="M5 20c0-3.9 3.1-7 7-7s7 3.1 7 7"/>',
@@ -979,7 +981,7 @@ function viewMed(id) {
     if (!seen.has(b.exp)) {
       seen.add(b.exp);
       cal = daysUntil(rd) >= 0
-        ? `<button class="link-btn" data-act="cal" data-id="${m.id}" data-exp="${b.exp}">${svg(P.cal, 16, 1.8)}加日历提醒（${dot(rd)}）</button>`
+        ? `<button class="link-btn" data-act="cal" data-id="${m.id}" data-exp="${b.exp}">${svg(P.bell, 16, 1.8)}加到提醒事项（${dot(rd)}）</button>`
         : '';
     }
     return `<div class="batch">
@@ -1130,37 +1132,54 @@ function doIn() {
   else closeLayer();
 }
 
-/* ---------- 日历提醒 ---------- */
-const CAL_TIME = '220000';
-function icsEvent(o) {
-  const d = o.date.replace(/-/g, '');
-  const now = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
-  const e = x => String(x).replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\n/g, '\\n');
-  return [
-    'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//yaoxiang//CN', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH',
-    'BEGIN:VEVENT', `UID:${o.uid}@yaoxiang`, `DTSTAMP:${now}`,
-    `DTSTART:${d}T${CAL_TIME}`, `DTEND:${d}T221500`,
-    `SUMMARY:${e(o.title)}`, `DESCRIPTION:${e(o.desc)}`,
-    'BEGIN:VALARM', 'ACTION:DISPLAY', `DESCRIPTION:${e(o.title)}`, 'TRIGGER:PT0M', 'END:VALARM',
-    'END:VEVENT', 'END:VCALENDAR', ''
-  ].join('\r\n');
+/* ---------- 苹果「提醒事项」 ----------
+   网页没法直接写提醒事项，所以通过「快捷指令」：App 打开 shortcuts:// 链接，把标题、时间、备注交给
+   手机里的「健康簿提醒」快捷指令，由它加到提醒事项里。快捷指令要先在手机上建一次（设置页里有步骤）。 */
+const SC_NAME = '健康簿提醒';
+const REM_TIME = '22:00';
+function remObj(o) { return { title: o.title, notes: o.desc || '', date: o.date }; }
+function scReady() { try { return localStorage.getItem('yaoxiang-sc') === '1'; } catch (e) { return false; } }
+function runShortcut(r) {
+  const payload = JSON.stringify({ title: r.title, due: `${r.date} ${REM_TIME}`, notes: r.notes || '' });
+  location.href = `shortcuts://run-shortcut?name=${encodeURIComponent(SC_NAME)}&input=text&text=${encodeURIComponent(payload)}`;
 }
-function downloadIcs(name, text) {
-  const blob = new Blob([text], { type: 'text/calendar' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url; a.download = name.replace(/[\\/:*?"<>|]/g, '_');
-  document.body.appendChild(a); a.click(); a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 60000);
+let remPending = null;
+function sendReminder(r) {
+  if (!r) return;
+  if (!scReady()) { remPending = r; openScSetup(); return; }
+  runShortcut(r);
+}
+function openScSetup() {
+  showLayer(`<div class="scrim" data-act="close"></div>
+    <div class="sheet" role="dialog" aria-label="设置提醒事项">
+      <h2 class="sheet-t">先建一个快捷指令（只要一次）</h2>
+      <div class="sc-steps">
+        <p>1. 打开 iPhone 自带的「快捷指令」App，点右上角「＋」新建。</p>
+        <p>2. 点最上面的名字，改成 <b>${SC_NAME}</b>（一字不差）。</p>
+        <p>3. 搜索并添加「<b>获取词典值</b>」（Get Dictionary Value），连加 3 个：<br>
+          第 1 个：获取「值」，键填 <b>title</b>，词典选「快捷指令输入」<br>
+          第 2 个：同样，键填 <b>due</b><br>
+          第 3 个：同样，键填 <b>notes</b></p>
+        <p>4. 再添加「<b>添加新提醒事项</b>」（Add New Reminder）：<br>
+          提醒事项名称点选第 1 个「词典值」；<br>
+          点「→」展开，打开「提醒」，时间点选第 2 个「词典值」；<br>
+          备注点选第 3 个「词典值」。</p>
+        <p>5. 点「完成」保存。</p>
+      </div>
+      <p class="hint">建好后点「试一下」，会加一条 2 分钟后的测试提醒。之后每次加提醒，App 会跳到快捷指令，加好后切回来就行。</p>
+      <div class="actions2">
+        <button class="btn" data-act="sc-test">试一下</button>
+        <button class="btn primary" data-act="sc-ok">${remPending ? '建好了，加提醒' : '建好了'}</button>
+      </div></div>`);
 }
 function icsFor(m, exp) {
-  return icsEvent({ uid: `${m.id}-${exp}-${m.remindDays}`, date: addDays(exp, -m.remindDays),
+  return remObj({ uid: `${m.id}-${exp}-${m.remindDays}`, date: addDays(exp, -m.remindDays),
     title: `药品快过期：${m.name}`, desc: `${BOXES[m.box]}「${m.name}」将于 ${dot(exp)} 过期。` });
 }
 function addToCalendar(m, exp) {
   const rd = addDays(exp, -m.remindDays);
   if (daysUntil(rd) < 0) { toast('已经在提醒期内，不用再加提醒'); return; }
-  downloadIcs(`${m.name}-${exp}.ics`, icsFor(m, exp));
+  sendReminder(icsFor(m, exp));
 }
 function afterNav(fn) {
   let done = false;
@@ -1244,8 +1263,8 @@ function setOpened(date) {
 }
 function askCalendarList(m, exps) {
   showLayer(`<div class="scrim" data-act="close"></div>
-    <div class="sheet menu-sheet" role="dialog" aria-label="日历提醒">
-      <h2 class="sheet-t">加日历提醒</h2>
+    <div class="sheet menu-sheet" role="dialog" aria-label="提醒事项">
+      <h2 class="sheet-t">加到提醒事项</h2>
       <p>有 ${exps.length} 个过期日期，一个一个加</p>
       ${exps.map(e => `<button data-act="cal" data-keep="1" data-id="${m.id}" data-exp="${e}">${dot(e)} 到期，提醒 ${dot(addDays(e, -m.remindDays))}</button>`).join('')}
       <button data-act="close">完成</button>
@@ -1254,12 +1273,12 @@ function askCalendarList(m, exps) {
 function askCalendar(m, exp) {
   const rd = addDays(exp, -m.remindDays);
   showLayer(`<div class="scrim" data-act="close"></div>
-    <div class="sheet" role="dialog" aria-label="日历提醒">
-      <h2 class="sheet-t">加到日历提醒？</h2>
+    <div class="sheet" role="dialog" aria-label="提醒事项">
+      <h2 class="sheet-t">加到提醒事项？</h2>
       <p>会在 ${dot(rd)} 晚上 10 点提醒：${esc(m.name)} 将于 ${dot(exp)} 过期。</p>
       <div class="actions2">
         <button class="btn" data-act="close">以后再说</button>
-        <button class="btn primary" data-act="cal" data-id="${m.id}" data-exp="${exp}">加到日历</button>
+        <button class="btn primary" data-act="cal" data-id="${m.id}" data-exp="${exp}">加到提醒事项</button>
       </div></div>`);
 }
 
@@ -1319,9 +1338,9 @@ function viewForm(mode, arg) {
       <div class="field-l">过期提醒</div>
       <div class="seg3">${REMIND_OPTIONS.map(n =>
         `<button data-act="f-remind" data-v="${n}" class="${f.remindDays === n ? 'on' : ''}">过期前 ${n} 天</button>`).join('')}</div>
-      ${mode === 'add' ? `<p class="hint" id="remind-hint">${remindHint()}</p>` : '<p class="hint">改了提醒天数后，到详情页重新加一次日历提醒</p>'}
+      ${mode === 'add' ? `<p class="hint" id="remind-hint">${remindHint()}</p>` : '<p class="hint">改了提醒天数后，到详情页重新加一次提醒</p>'}
 
-      <button class="btn primary wide" data-act="save-form">${mode === 'add' ? '保存，并添加日历提醒' : '保存'}</button>
+      <button class="btn primary wide" data-act="save-form">${mode === 'add' ? '保存，并加到提醒事项' : '保存'}</button>
       ${mode === 'edit' ? '<button class="btn danger wide" data-act="del-med">删除这个药品</button>' : ''}
     </main>`;
 }
@@ -1332,7 +1351,7 @@ function remindHint() {
   const exps = formExps();
   if (!exps.length) return '过期日期可以先不填，之后在详情页补上';
   const rd = addDays(exps[0], -form.remindDays);
-  return daysUntil(rd) < 0 ? '已经在提醒期内了，不会再加日历提醒' : `将在 ${dot(rd)} 晚上 10 点通过日历提醒你`;
+  return daysUntil(rd) < 0 ? '已经在提醒期内了，不会再加提醒' : `将在 ${dot(rd)} 晚上 10 点用提醒事项提醒你`;
 }
 function commitTag() {
   const t = form.tagDraft.replace(/[#＃,，\s]/g, '');
@@ -1383,8 +1402,9 @@ function saveForm() {
   form = null;
   save(m);
   const due = exps.filter(e => daysUntil(addDays(e, -m.remindDays)) >= 0);
-  if (due.length === 1) addToCalendar(m, due[0]);
+  if (due.length === 1 && scReady()) addToCalendar(m, due[0]);
   goReplace('#/med/' + m.id);
+  if (due.length === 1 && !scReady()) afterNav(() => addToCalendar(m, due[0]));
   if (due.length > 1) afterNav(() => askCalendarList(m, due));
 }
 function delMed() {
@@ -1649,6 +1669,11 @@ function viewSettings() {
       ${cloud ? '<button class="line btn-line" data-act="logout">退出登录</button>' : ''}
     </div>
     ${cloud ? '' : '<p class="hint">现在数据只在这台手机上。设置好云同步后，换手机登录就能看到。</p>'}
+    <h2 class="sec">提醒</h2>
+    <div class="card">
+      <button class="line btn-line" data-act="sc-setup"><span>提醒事项设置</span><span class="muted">${scReady() ? '已设置' : '还没设置'}</span></button>
+    </div>
+    <p class="hint">提醒都会加到 iPhone 的「提醒事项」里，时间是当天晚上 10 点。</p>
     <h2 class="sec">版本</h2>
     <div class="card">
       <div class="line"><span>当前版本</span><span class="muted">${APP_VER}</span></div>
@@ -2659,7 +2684,7 @@ function buildLog() {
   }
   return l;
 }
-/* 这条记录能加的日历提醒：{ date: 提醒那天, text: 说明, ics, name } */
+/* 这条记录能加的提醒：{ date: 提醒那天, text: 说明, ics, name } */
 function logCal(l, me) {
   const k = kindOf(l);
   if (k === 'vaccine' && l.vacName && l.date) {
@@ -2681,12 +2706,12 @@ function logCal(l, me) {
 function calCardHtml() {
   if (lf.kind === 'symptom') return '';
   const c = logCal(buildLog(), state.members.get(lf.memberId));
-  const why = lf.kind === 'visit' ? '填了下次复诊日期，就能加日历提醒'
-    : lf.kind === 'deworm' ? '设置了重复，就能把下次加到日历' : '选好疫苗，就能加日历提醒';
-  if (!c) return `<div class="field-l">日历提醒</div><p class="hint" style="margin-top:0">${why}</p>`;
+  const why = lf.kind === 'visit' ? '填了下次复诊日期，就能加提醒'
+    : lf.kind === 'deworm' ? '设置了重复，就能把下次加到提醒事项' : '选好疫苗，就能加提醒';
+  if (!c) return `<div class="field-l">提醒</div><p class="hint" style="margin-top:0">${why}</p>`;
   const past = daysUntil(c.date) < 0;
-  return `<div class="field-l">日历提醒</div>
-    <button class="btn wide" data-act="log-cal"${past ? ' disabled' : ''}>${svg(P.cal, 18, 2)}${past ? '提醒日期已经过了' : '加到日历'}</button>
+  return `<div class="field-l">提醒</div>
+    <button class="btn wide" data-act="log-cal"${past ? ' disabled' : ''}>${svg(P.bell, 18, 2)}${past ? '提醒日期已经过了' : '加到提醒事项'}</button>
     <p class="hint">${c.remind}</p>`;
 }
 function saveLog() {
@@ -2724,28 +2749,28 @@ function askLogCal(l, me) {
   const k = kindOf(l);
   const what = k === 'vaccine' ? `${esc(l.vacName)}：` : k === 'deworm' ? `${DW_TYPES[l.dwType]}驱虫${rptText(l.rpt)}，` : '';
   showLayer(`<div class="scrim" data-act="close"></div>
-    <div class="sheet" role="dialog" aria-label="日历提醒">
-      <h2 class="sheet-t">加个日历提醒？</h2>
+    <div class="sheet" role="dialog" aria-label="提醒事项">
+      <h2 class="sheet-t">加到提醒事项？</h2>
       <p>${esc(me ? me.name : '')} ${what}${c.text}。</p>
       <div class="actions2">
         <button class="btn" data-act="close">以后再说</button>
-        <button class="btn primary" data-act="saved-cal" data-id="${l.id}">加到日历</button>
+        <button class="btn primary" data-act="saved-cal" data-id="${l.id}">加到提醒事项</button>
       </div></div>`);
 }
 function dwIcs(l, me) {
   const nx = nextDue(l.date, l.rpt);
-  return icsEvent({ uid: `${l.id}-dw-${nx}`, date: nx,
+  return remObj({ uid: `${l.id}-dw-${nx}`, date: nx,
     title: `${me ? me.name : ''} ${DW_TYPES[l.dwType]}驱虫：${l.dwProduct}`,
     desc: `上次 ${dot(l.date)}，${rptText(l.rpt)}。` });
 }
 function vaccineIcs(l, me) {
   const due = vacDue(l);
-  return icsEvent({ uid: `${l.id}-vac`, date: addDays(due, -l.remindDays),
+  return remObj({ uid: `${l.id}-vac`, date: addDays(due, -l.remindDays),
     title: `疫苗到期：${me ? me.name : ''} ${l.vacName}`,
     desc: `${dot(l.date)} 打的 ${l.vacName}，${l.years} 年有效，${dot(due)} 到期。` });
 }
 function revisitIcs(l, me) {
-  return icsEvent({ uid: `${l.id}-rv-${l.revisit}`, date: addDays(l.revisit, -1),
+  return remObj({ uid: `${l.id}-rv-${l.revisit}`, date: addDays(l.revisit, -1),
     title: `明天复诊：${me ? me.name : ''}${l.place ? ' · ' + l.place : ''}`,
     desc: `${dot(l.revisit)} 复诊${l.place ? '（' + l.place + '）' : ''}。上次就诊 ${dot(l.date)}。` });
 }
@@ -3413,8 +3438,9 @@ const actions = {
   'do-in': doIn,
   cal: el => {
     const m = state.meds.get(el.dataset.id);
-    if (m) addToCalendar(m, el.dataset.exp);
-    if (el.closest('.sheet') && !el.dataset.keep) closeLayer();
+    const inSheet = el.closest('.sheet') && !el.dataset.keep;
+    if (inSheet) closeLayer();
+    if (m) setTimeout(() => addToCalendar(m, el.dataset.exp), inSheet ? 350 : 0);
   },
   'open-date': el => openDateSheet(el.dataset.id, el.dataset.bid),
   'exp-date': el => expDateSheet(el.dataset.id, el.dataset.bid),
@@ -3754,16 +3780,31 @@ const actions = {
     mlSave(key, items);
     openListManage(key);
   },
+  'sc-test': () => {
+    const d = new Date(Date.now() + 120000);
+    const pad = n => String(n).padStart(2, '0');
+    const payload = JSON.stringify({ title: '健康簿测试提醒', due: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`, notes: '看到这条就说明设置好了，可以删掉' });
+    location.href = `shortcuts://run-shortcut?name=${encodeURIComponent(SC_NAME)}&input=text&text=${encodeURIComponent(payload)}`;
+  },
+  'sc-ok': () => {
+    try { localStorage.setItem('yaoxiang-sc', '1'); } catch (e) { /* 无痕模式 */ }
+    const r = remPending;
+    remPending = null;
+    closeLayer();
+    if (r) setTimeout(() => runShortcut(r), 350);
+    else toast('好了，以后加提醒会直接跳到快捷指令');
+  },
+  'sc-setup': () => { remPending = null; openScSetup(); },
   'saved-cal': el => {
     const l = state.logs.get(el.dataset.id);
     const c = l ? logCal(l, state.members.get(l.memberId)) : null;
-    if (c) downloadIcs(c.name, c.ics());
     closeLayer();
+    if (c) setTimeout(() => sendReminder(c.ics()), 350);
   },
   'log-cal': () => {
     if (!lf) return;
     const c = logCal(buildLog(), state.members.get(lf.memberId));
-    if (c) downloadIcs(c.name, c.ics());
+    if (c) sendReminder(c.ics());
   },
   'save-log': saveLog,
   'del-log': delLog,
@@ -3889,7 +3930,7 @@ document.addEventListener('change', async e => {
     const m = clone(state.meds.get(t.dataset.id));
     m.remindDays = Number(t.value);
     save(m);
-    toast(`已改为过期前 ${m.remindDays} 天，记得重新加日历提醒`);
+    toast(`已改为过期前 ${m.remindDays} 天，记得重新加一次提醒`);
   }
 });
 let cameFrom = '';
