@@ -384,7 +384,7 @@ const BOXES = { cat: '猫用药', human: '人用药' };
 const REMIND_OPTIONS = [30, 60, 120];
 const LOG_TEXT = { add: '添加', in: '入库', use: '用完', open: '开封' };
 const FB_VER = '10.12.2';
-const APP_VER = '2026.11.05-88';
+const APP_VER = '2026.11.06-89';
 const MAX_PHOTOS = 6;
 const PHOTO_PX = 640;
 const PHOTO_Q = 0.62;
@@ -1135,13 +1135,18 @@ function doIn() {
 /* ---------- 苹果「提醒事项」 ----------
    网页没法直接写提醒事项，所以通过「快捷指令」：App 打开 shortcuts:// 链接，把标题、时间、备注交给
    手机里的「健康簿提醒」快捷指令，由它加到提醒事项里。快捷指令要先在手机上建一次（设置页里有步骤）。 */
-const SC_NAME = '健康簿提醒';
+const SC_NAME = 'Medication Reminder';
 const REM_TIME = '22:00';
 function remObj(o) { return { title: o.title, notes: o.desc || '', date: o.date }; }
 function scReady() { try { return localStorage.getItem('yaoxiang-sc') === '1'; } catch (e) { return false; } }
+/* 交给快捷指令的是三行文字：第 1 行标题，第 2 行时间，最后一行备注（备注里的换行换成空格） */
+function scText(title, due, notes) {
+  const one = x => String(x || '').replace(/\s*\n\s*/g, ' ').trim();
+  return [one(title), due, one(notes) || '健康簿'].join('\n');
+}
 function runShortcut(r) {
-  const payload = JSON.stringify({ title: r.title, due: `${r.date} ${REM_TIME}`, notes: r.notes || '' });
-  location.href = `shortcuts://run-shortcut?name=${encodeURIComponent(SC_NAME)}&input=text&text=${encodeURIComponent(payload)}`;
+  const text = scText(r.title, `${r.date} ${REM_TIME}`, r.notes);
+  location.href = `shortcuts://run-shortcut?name=${encodeURIComponent(SC_NAME)}&input=text&text=${encodeURIComponent(text)}`;
 }
 let remPending = null;
 function sendReminder(r) {
@@ -1154,17 +1159,15 @@ function openScSetup() {
     <div class="sheet" role="dialog" aria-label="设置提醒事项">
       <h2 class="sheet-t">先建一个快捷指令（只要一次）</h2>
       <div class="sc-steps">
-        <p>1. 打开 iPhone 自带的「快捷指令」App，点右上角「＋」新建。</p>
-        <p>2. 点最上面的名字，改成 <b>${SC_NAME}</b>（一字不差）。</p>
-        <p>3. 搜索并添加「<b>获取词典值</b>」（Get Dictionary Value），连加 3 个：<br>
-          第 1 个：获取「值」，键填 <b>title</b>，词典选「快捷指令输入」<br>
-          第 2 个：同样，键填 <b>due</b><br>
-          第 3 个：同样，键填 <b>notes</b></p>
-        <p>4. 再添加「<b>添加新提醒事项</b>」（Add New Reminder）：<br>
-          提醒事项名称点选第 1 个「词典值」；<br>
-          点「→」展开，打开「提醒」，时间点选第 2 个「词典值」；<br>
-          备注点选第 3 个「词典值」。</p>
-        <p>5. 点「完成」保存。</p>
+        <p>1. 打开「快捷指令」(Shortcuts)，点右上角「＋」，名字改成 <b>${SC_NAME}</b>（大小写、空格都要一样）。</p>
+        <p>2. 点 ⓘ，打开「在共享表单中显示」(Show in Share Sheet)。</p>
+        <p>3. 添加「拆分文本」(Split Text)：拆分「快捷指令输入」，按「新行」(New Lines)。</p>
+        <p>4. 添加「从列表中获取项目」(Get Item from List)：<b>第一项</b>，列表选拆分文本。这是标题。</p>
+        <p>5. 再加一个「从列表中获取项目」：<b>索引处的项目</b>，填 <b>2</b>。这是时间。</p>
+        <p>6. 添加「从输入中获取日期」(Get Dates from Input)，输入选第 5 步的结果。</p>
+        <p>7. 再加一个「从列表中获取项目」：<b>最后一项</b>。这是备注。</p>
+        <p>8. 添加「添加新提醒事项」(Add New Reminder)：内容选第 4 步，展开后「提醒我」选第 6 步的日期，备注选第 7 步。</p>
+        <p>9. 点「完成」。</p>
       </div>
       <p class="hint">建好后点「试一下」，会加一条 2 分钟后的测试提醒。之后每次加提醒，App 会跳到快捷指令，加好后切回来就行。</p>
       <div class="actions2">
@@ -3783,8 +3786,8 @@ const actions = {
   'sc-test': () => {
     const d = new Date(Date.now() + 120000);
     const pad = n => String(n).padStart(2, '0');
-    const payload = JSON.stringify({ title: '健康簿测试提醒', due: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`, notes: '看到这条就说明设置好了，可以删掉' });
-    location.href = `shortcuts://run-shortcut?name=${encodeURIComponent(SC_NAME)}&input=text&text=${encodeURIComponent(payload)}`;
+    const text = scText('健康簿测试提醒', `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`, '看到这条就说明设置好了，可以删掉');
+    location.href = `shortcuts://run-shortcut?name=${encodeURIComponent(SC_NAME)}&input=text&text=${encodeURIComponent(text)}`;
   },
   'sc-ok': () => {
     try { localStorage.setItem('yaoxiang-sc', '1'); } catch (e) { /* 无痕模式 */ }
