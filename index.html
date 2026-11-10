@@ -147,6 +147,9 @@ button.tag{height:34px;padding:0 12px;font-size:14px;border-radius:10px;display:
 .batch-m{display:flex;align-items:center;gap:10px;font-size:15px}
 .link-btn{align-self:flex-start;border:0;background:none;color:var(--accent);font-size:14px;padding:4px 0;display:inline-flex;align-items:center;gap:6px;min-height:36px}
 .log{display:flex;gap:14px;padding:12px 0;border-bottom:1px solid var(--line);font-size:15px}
+.log-btn{width:100%;background:none;border:0;border-bottom:1px solid var(--line);color:inherit;font:inherit;font-size:15px;text-align:left;align-items:center;cursor:pointer}
+.log-btn .log-t{flex:1}
+.log-btn svg{color:var(--muted);flex-shrink:0}
 .log:last-child{border-bottom:0}
 .log-d{color:var(--muted);flex-shrink:0;font-variant-numeric:tabular-nums}
 .log small{color:var(--muted)}
@@ -384,7 +387,7 @@ const BOXES = { cat: '猫用药', human: '人用药' };
 const REMIND_OPTIONS = [30, 60, 120];
 const LOG_TEXT = { add: '添加', in: '入库', use: '用完', open: '开封' };
 const FB_VER = '10.12.2';
-const APP_VER = '2026.11.06-89';
+const APP_VER = '2026.11.10-90';
 const MAX_PHOTOS = 6;
 const PHOTO_PX = 640;
 const PHOTO_Q = 0.62;
@@ -992,10 +995,16 @@ function viewMed(id) {
       ${cal}</div>`;
   }).join('') : '<p class="empty" style="padding:24px 0">已经用完了，点「库存更新」可以入库</p>';
 
-  const logs = (m.log || []).slice().reverse().slice(0, 30);
-  const logHtml = logs.length ? `<h2 class="sec">记录</h2><div class="card">${logs.map(l => `
-    <div class="log"><span class="log-d">${dot(l.date)}</span>
-      <span>${LOG_TEXT[l.type] || l.type} ${l.qty} 件${l.exp ? `<small>（${dot(l.exp)} 到期）</small>` : ''}${l.note ? `<br><small>${esc(l.note)}</small>` : ''}</span></div>`).join('')}</div>` : '';
+  /* 按日期从新到旧排（改过日期的也排对位置）；开封、用完那两种可以点进去改日期 */
+  const logs = (m.log || []).map((l, i) => ({ l, i }))
+    .sort((a, b) => b.l.date.localeCompare(a.l.date) || b.i - a.i).slice(0, 30);
+  const logHtml = logs.length ? `<h2 class="sec">记录</h2><div class="card">${logs.map(({ l, i }) => {
+    const inner = `<span class="log-d">${dot(l.date)}</span>
+      <span class="log-t">${LOG_TEXT[l.type] || l.type} ${l.qty} 件${l.exp ? `<small>（${dot(l.exp)} 到期）</small>` : ''}${l.note ? `<br><small>${esc(l.note)}</small>` : ''}</span>`;
+    return l.type === 'use' || l.type === 'open'
+      ? `<button class="log log-btn" data-act="log-date" data-id="${m.id}" data-i="${i}">${inner}${svg(P.chev, 16)}</button>`
+      : `<div class="log">${inner}</div>`;
+  }).join('')}</div>` : '';
 
   const pics = photosOf(m);
   const img = pics.length
@@ -1050,13 +1059,14 @@ function renderSheet() {
   const inTarget = bs.find(b => (b.exp || '') === (s.exp || '') && !b.opened);
   const base = s.mode === 'out' ? (sel ? sel.qty : 0) : (inTarget ? inTarget.qty : 0);
   const after = s.mode === 'out' ? base - s.n : base + s.n;
-  const showDate = s.mode === 'out' && sel && !sel.opened;
+  const showDate = s.mode === 'out' && !!sel;
 
   const stepper = `<div class="line"><span>数量</span><div class="stepper">
     <button data-act="n" data-v="-1" aria-label="减少"${s.n <= 1 ? ' disabled' : ''}>${svg(P.minus, 20, 2.2)}</button>
     <b class="num">${s.n}</b>
     <button data-act="n" data-v="1" aria-label="增加"${s.n >= max ? ' disabled' : ''}>${svg(P.plus, 20, 2.2)}</button></div></div>`;
-  const dateRow = showDate ? `<label class="line"><span>开封日期</span><input type="date" data-in="date" value="${s.date}"></label>` : '';
+  const dateLabel = sel && sel.opened ? '用完日期' : '日期';
+  const dateRow = showDate ? `<label class="line"><span>${dateLabel}</span><input type="date" data-in="date" value="${s.date}" max="${todayStr()}"></label>` : '';
   const noteRow = `<label class="line"><span>备注</span><input type="text" data-in="note" placeholder="添加说明（可选）" value="${esc(s.note)}"></label>`;
 
   let body;
@@ -1069,7 +1079,7 @@ function renderSheet() {
         <button class="btn" data-act="do-use">用完</button>
         <button class="btn primary" data-act="do-open"${sel && !sel.opened ? '' : ' disabled'}>开封</button>
       </div>
-      <p class="hint">${sel && sel.opened ? '这一批已经开封了，点「用完」会减少数量' : '「开封」记录开封日期，不减少数量；「用完」减少数量'}</p>`;
+      <p class="hint">${sel && sel.opened ? '这一批已经开封了，点「用完」会减少数量，记成上面这一天' : '「开封」不减少数量，「用完」减少数量，都记成上面这一天'}</p>`;
   } else {
     const exps = [...new Set(bs.map(b => b.exp))].filter(Boolean);
     body = `<label class="line"><span>过期日期</span><input type="date" data-in="exp" value="${s.exp}"></label>
@@ -1094,8 +1104,11 @@ function doUse() {
   const b = m.batches.find(x => x.id === s.batchId);
   if (!b) return;
   const n = Math.min(s.n, b.qty);
+  const date = s.date || todayStr();
+  if (b.opened && date < b.opened) { toast(`用完日期不能早于开封日期 ${dot(b.opened)}`); return; }
+  if (date > todayStr()) { toast('不能选以后的日期'); return; }
   b.qty -= n;
-  addLog(m, 'use', b.exp, n, b.opened ? todayStr() : (s.date || todayStr()), s.note);
+  addLog(m, 'use', b.exp, n, date, s.note);
   tidy(m);
   save(m);
   closeLayer();
@@ -1107,6 +1120,7 @@ function doOpen() {
   if (!b || b.opened) return;
   const n = Math.min(s.n, b.qty);
   const date = s.date || todayStr();
+  if (date > todayStr()) { toast('不能选以后的日期'); return; }
   b.qty -= n;
   const t = m.batches.find(x => (x.exp || '') === (b.exp || '') && x.opened === date);
   if (t) t.qty += n;
@@ -1251,10 +1265,61 @@ function openDateSheet(id, bid) {
       </div>
     </div>`);
 }
+/* 把「某天开封」的那一批改成另一天开封（最多挪 n 件） */
+function moveOpened(m, exp, from, to, n) {
+  const src = m.batches.find(x => (x.exp || '') === (exp || '') && x.opened === from);
+  if (!src || from === to) return;
+  const k = Math.min(n, src.qty);
+  src.qty -= k;
+  const t = m.batches.find(x => x !== src && (x.exp || '') === (exp || '') && x.opened === to);
+  if (t) t.qty += k;
+  else m.batches.push({ id: uid(), exp, qty: k, opened: to });
+  tidy(m);
+}
+let logEdit = null;
+function openLogDate(id, i) {
+  const m = state.meds.get(id);
+  const l = m && (m.log || [])[i];
+  if (!l || (l.type !== 'use' && l.type !== 'open')) return;
+  logEdit = { id, i, type: l.type, date: l.date, exp: l.exp, qty: l.qty };
+  const what = l.type === 'use' ? '用完' : '开封';
+  showLayer(`<div class="scrim" data-act="close"></div>
+    <div class="sheet" role="dialog" aria-label="改${what}日期">
+      <h2 class="sheet-t">改${what}日期</h2>
+      <p>${what} ${l.qty} 件${l.exp ? `（${dot(l.exp)} 到期）` : ''}</p>
+      <label class="line"><span>${what}日期</span><input id="log-date-in" type="date" value="${l.date}" max="${todayStr()}"></label>
+      ${l.type === 'open' ? '<p class="hint">批次里的开封日期会一起改</p>' : ''}
+      <div class="actions2">
+        <button class="btn" data-act="close">取消</button>
+        <button class="btn primary" data-act="log-date-save">确认更改</button>
+      </div>
+    </div>`);
+}
+function saveLogDate() {
+  const e = logEdit;
+  const inp = document.getElementById('log-date-in');
+  const nd = inp && inp.value;
+  if (!e || !nd) { toast('先选日期'); return; }
+  if (nd > todayStr()) { toast('不能选以后的日期'); return; }
+  const m = clone(state.meds.get(e.id));
+  const l = (m.log || [])[e.i];
+  if (!l || l.type !== e.type || l.date !== e.date) { closeLayer(); toast('这条记录刚被改过，重新打开再试'); return; }
+  if (nd === l.date) { closeLayer(); return; }
+  if (l.type === 'open') moveOpened(m, l.exp, l.date, nd, l.qty);
+  l.date = nd;
+  logEdit = null;
+  save(m);
+  closeLayer();
+  toast(`已改为 ${dot(nd)}`);
+}
 function setOpened(date) {
   const m = clone(state.meds.get(openEdit.id));
   const b = m.batches.find(x => x.id === openEdit.bid);
   if (!b) { closeLayer(); return; }
+  const was = b.opened;
+  if (was && date && was !== date) {
+    (m.log || []).forEach(l => { if (l.type === 'open' && (l.exp || '') === (b.exp || '') && l.date === was) l.date = date; });
+  }
   b.opened = date || null;
   const same = m.batches.find(x => x !== b && (x.exp || '') === (b.exp || '') && (x.opened || null) === (b.opened || null));
   if (same) { same.qty += b.qty; b.qty = 0; }
@@ -3446,6 +3511,8 @@ const actions = {
     if (m) setTimeout(() => addToCalendar(m, el.dataset.exp), inSheet ? 350 : 0);
   },
   'open-date': el => openDateSheet(el.dataset.id, el.dataset.bid),
+  'log-date': el => openLogDate(el.dataset.id, Number(el.dataset.i)),
+  'log-date-save': saveLogDate,
   'exp-date': el => expDateSheet(el.dataset.id, el.dataset.bid),
   'exp-date-save': () => setBatchExp(expEdit.date),
   'close-exp-date': () => { expEdit = null; closeLayer(); },
