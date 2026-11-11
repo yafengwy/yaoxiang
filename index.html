@@ -387,7 +387,7 @@ const BOXES = { cat: '猫用药', human: '人用药' };
 const REMIND_OPTIONS = [30, 60, 120];
 const LOG_TEXT = { add: '添加', in: '入库', use: '用完', open: '开封' };
 const FB_VER = '10.12.2';
-const APP_VER = '2026.11.10-90';
+const APP_VER = '2026.11.11-91';
 const MAX_PHOTOS = 6;
 const PHOTO_PX = 640;
 const PHOTO_Q = 0.62;
@@ -861,8 +861,17 @@ function viewHome() {
 }
 
 /* ---------- 药箱列表 ---------- */
+/* 列表里的到期日期：所有批次的日期放在一行，从早到晚 */
+function expLine(m) {
+  const ls = liveBatches(m);
+  if (!ls.length) return '已用完';
+  const dated = [...new Set(ls.filter(b => b.exp).map(b => b.exp))].sort();
+  const hasNo = ls.some(b => !b.exp);
+  if (!dated.length) return '过期日期还没填';
+  return `${dated.map(dot).join('、')} 到期${hasNo ? '，还有没填日期的' : ''}`;
+}
 function medRow(m) {
-  const tot = totalQty(m), op = openedQty(m), e = nearestExp(m);
+  const tot = totalQty(m), op = openedQty(m);
   return `<a class="row${tot ? '' : ' dim'}" href="#/med/${m.id}">
     ${photoHtml(m, 'thumb')}
     <div class="row-b">
@@ -870,7 +879,7 @@ function medRow(m) {
       ${tagsHtml(m, false)}
       <div class="row-s">共 <b class="qty">${tot}</b> 件</div>
       ${op ? `<div class="row-s warn-t"><b class="qty">${op}</b> 件已开封 · ${[...new Set(liveBatches(m).filter(x => x.opened).map(x => x.opened))].sort().map(dot).join('、')}</div>` : ''}
-      <div class="row-s">${noExp(m) ? '过期日期还没填' : (e ? dot(e) + ' 到期' : '已用完')}</div>
+      <div class="row-s">${expLine(m)}</div>
     </div>
     ${daysHtml(m)}</a>`;
 }
